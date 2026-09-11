@@ -100,3 +100,37 @@ describe("IssueDetailView", () => {
     expect(lastFrame() ?? "").toMatch(/Comments.*2/)
   })
 })
+
+describe("IssueDetailView, framed", () => {
+  /*
+   * A host with its own chrome takes the screen in parts. The view must then
+   * draw neither its title line nor its footer — the frame owns both — and the
+   * type row folds into the title so it is not said twice.
+   */
+  it("hands the host title, subtitle and hints, and draws no chrome of its own", () => {
+    const seen: { title?: string; subtitle?: string; hints?: string[] } = {}
+    const { lastFrame } = render(
+      <IssueDetailView
+        issue={issue()}
+        width={80}
+        height={30}
+        onBack={noop}
+        onOpenBrowser={noop}
+        frame={({ title, subtitle, hints, body }) => {
+          seen.title = title
+          seen.subtitle = subtitle
+          seen.hints = hints.map(([k]) => k)
+          return body
+        }}
+      />,
+    )
+    const frame = lastFrame() ?? ""
+    expect(seen.title).toBe("SHOP-1234 · Task")
+    expect(seen.subtitle).toBe("bring the checkout config under terraform")
+    expect(seen.hints).toEqual(["←→", "↑↓", "o", "esc"])
+    expect(frame).not.toContain("SHOP-1234 bring the checkout")
+    expect(frame).not.toContain("browser")
+    expect(frame).not.toMatch(/^\s*type/m)
+    expect(frame).toContain("In Progress")
+  })
+})

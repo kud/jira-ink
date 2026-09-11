@@ -1,4 +1,4 @@
-import { MarkdownViewport } from "@kud/ink-markdown";
+import { MarkdownViewport, type MarkdownTheme } from "@kud/ink-markdown"
 import {
   Badge,
   FooterHints,
@@ -7,15 +7,15 @@ import {
   useTabs,
   type Hint,
   type TabItem,
-} from "@kud/ink-ui";
-import { Box, Text, useInput } from "ink";
-import { useState } from "react";
-import type { IssueDetail } from "../lib/issue-detail.js";
+} from "@kud/ink-ui"
+import { Box, Text, useInput } from "ink"
+import { useState, type ReactNode } from "react"
+import type { IssueDetail } from "../lib/issue-detail.js"
 
-type Section = "description" | "comments" | "attachments";
+type Section = "description" | "comments" | "attachments"
 
 const truncate = (s: string, max: number): string =>
-  s.length <= max ? s : `${s.slice(0, Math.max(0, max - 1))}…`;
+  s.length <= max ? s : `${s.slice(0, Math.max(0, max - 1))}…`
 
 const originOf = (a: IssueDetail["attachments"][number]): string =>
   a.origins
@@ -26,17 +26,17 @@ const originOf = (a: IssueDetail["attachments"][number]): string =>
           ? "description"
           : "issue",
     )
-    .join(", ");
+    .join(", ")
 
 const humanSize = (bytes: number): string => {
-  const units = ["B", "KB", "MB", "GB"];
+  const units = ["B", "KB", "MB", "GB"]
   const e = Math.min(
     units.length - 1,
     Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(1024)),
-  );
-  const value = bytes / 1024 ** e;
-  return `${e === 0 ? value : value.toFixed(1)}${units[e]}`;
-};
+  )
+  const value = bytes / 1024 ** e
+  return `${e === 0 ? value : value.toFixed(1)}${units[e]}`
+}
 
 /** Comments become one Markdown document so they scroll as a single pane. */
 const commentsAsMarkdown = (issue: IssueDetail): string =>
@@ -44,7 +44,7 @@ const commentsAsMarkdown = (issue: IssueDetail): string =>
     ? "_No comments._"
     : issue.comments
         .map((c) => `**${c.author}** · ${c.created}\n\n${c.body}`)
-        .join("\n\n---\n\n");
+        .join("\n\n---\n\n")
 
 const attachmentsAsMarkdown = (issue: IssueDetail): string =>
   issue.attachments.length === 0
@@ -54,24 +54,39 @@ const attachmentsAsMarkdown = (issue: IssueDetail): string =>
           (a) =>
             `- \`${a.filename}\` — ${a.mimeType}, ${humanSize(a.size)}\n  from ${originOf(a)}\n  \`jira attachment read ${issue.key} ${a.filename}\``,
         )
-        .join("\n");
+        .join("\n")
 
 export type IssueDetailViewProps = {
-  issue: IssueDetail;
-  height: number;
-  width: number;
-  onBack: () => void;
+  issue: IssueDetail
+  height: number
+  width: number
+  onBack: () => void
   /**
    * The write actions are optional, and a key whose handler is absent is
    * neither bound nor hinted. A host that only READS — cockpit's ticket drill —
    * mounts the same screen jira-cli's TUI does, minus the verbs it has no way
    * to honour, rather than a hint row promising `t` and `c` that do nothing.
    */
-  onTransition?: () => void;
-  onComment?: () => void;
-  onAssign?: () => void;
-  onOpenBrowser?: () => void;
-};
+  onTransition?: () => void
+  onComment?: () => void
+  onAssign?: () => void
+  onOpenBrowser?: () => void
+  /**
+   * A host that draws its own chrome — a bordered drill frame with the title
+   * on top and the hints pinned at the foot — takes the screen in parts and
+   * places them. The view then draws neither its title line nor its footer,
+   * so nothing appears twice. `height` is still the whole area the host has
+   * given the body, frame excluded.
+   */
+  frame?: (parts: {
+    title: string
+    subtitle: string
+    hints: Hint[]
+    body: ReactNode
+  }) => ReactNode
+  /** Colours for the Markdown body; a host passes its own tokens so links, code and headings sit in its palette. */
+  theme?: MarkdownTheme
+}
 
 export const IssueDetailView = ({
   issue,
@@ -82,6 +97,8 @@ export const IssueDetailView = ({
   onComment,
   onAssign,
   onOpenBrowser,
+  frame,
+  theme,
 }: IssueDetailViewProps) => {
   const tabs: TabItem<Section>[] = [
     { value: "description", label: "Description" },
@@ -91,29 +108,36 @@ export const IssueDetailView = ({
       label: "Attachments",
       count: issue.attachments.length,
     },
-  ];
-  const { active } = useTabs(tabs, { initial: "description" });
-  const [scroll, setScroll] = useState(0);
+  ]
+  const { active } = useTabs(tabs, { initial: "description" })
+  const [scroll, setScroll] = useState(0)
 
   useInput((input, key) => {
-    if (key.escape || key.leftArrow) return onBack();
-    if (input === "t" && onTransition) return onTransition();
-    if (input === "c" && onComment) return onComment();
-    if (input === "a" && onAssign) return onAssign();
-    if (input === "o" && onOpenBrowser) return onOpenBrowser();
-    // ←→ belong to useTabs; only vertical movement is ours to handle.
-    if (key.downArrow || input === "j") setScroll((s) => s + 1);
-    if (key.upArrow || input === "k") setScroll((s) => Math.max(0, s - 1));
-  });
+    if (key.escape) return onBack()
+    if (input === "t" && onTransition) return onTransition()
+    if (input === "c" && onComment) return onComment()
+    if (input === "a" && onAssign) return onAssign()
+    if (input === "o" && onOpenBrowser) return onOpenBrowser()
+    // ←→ belong to useTabs; only vertical movement is ours to handle. ← used
+    // to ALSO fire onBack here, one line above the hint promising it switches
+    // sections — both handlers ran, and the unmount won.
+    if (key.downArrow || input === "j") setScroll((s) => s + 1)
+    if (key.upArrow || input === "k") setScroll((s) => Math.max(0, s - 1))
+  })
 
   const source =
     active === "comments"
       ? commentsAsMarkdown(issue)
       : active === "attachments"
         ? attachmentsAsMarkdown(issue)
-        : issue.description || "_No description._";
+        : issue.description || "_No description._"
 
-  const bodyHeight = Math.max(3, height - 12);
+  // The lines the view spends above and below the viewport: the key/value
+  // block and the tabs in both shapes; the title line and the footer only when
+  // the view draws its own chrome. Framed, the host has already paid for those
+  // — and for the `type` row, which the frame's title carries.
+  const chromeLines = frame ? 8 : 12
+  const bodyHeight = Math.max(3, height - chromeLines)
 
   const hints: Hint[] = [
     ["←→", "section"],
@@ -123,15 +147,14 @@ export const IssueDetailView = ({
     ...(onAssign ? ([["a", "assign to me"]] as Hint[]) : []),
     ...(onOpenBrowser ? ([["o", "browser"]] as Hint[]) : []),
     ["esc", "back"],
-  ];
+  ]
 
-  return (
+  // Status is state and stays a badge; type is identity and, framed, moves up
+  // into the title beside the key the way `#123 · repo` carries a PR's — a
+  // header that says "Task" twice in five rows reads as nobody having checked.
+  const body = (
     <Box flexDirection="column">
-      <Text bold>
-        {issue.key} {issue.summary}
-      </Text>
-
-      <Box marginTop={1} flexDirection="column">
+      <Box flexDirection="column">
         {issue.parent && (
           <KeyValue
             label="parent"
@@ -139,7 +162,7 @@ export const IssueDetailView = ({
           />
         )}
         <KeyValue label="status" value={<Badge>{issue.status}</Badge>} />
-        <KeyValue label="type" value={issue.type} />
+        {frame ? null : <KeyValue label="type" value={issue.type} />}
         <KeyValue label="assignee" value={issue.assignee} />
         <KeyValue label="reporter" value={issue.reporter} />
         {issue.labels.length > 0 && (
@@ -157,12 +180,31 @@ export const IssueDetailView = ({
           width={Math.max(20, width - 2)}
           height={bodyHeight}
           scrollOffset={scroll}
+          theme={theme}
         />
       </Box>
+    </Box>
+  )
+
+  if (frame)
+    return frame({
+      title: `${issue.key} · ${issue.type}`,
+      subtitle: issue.summary,
+      hints,
+      body,
+    })
+
+  return (
+    <Box flexDirection="column">
+      <Text bold>
+        {issue.key} {issue.summary}
+      </Text>
+
+      <Box marginTop={1}>{body}</Box>
 
       <Box marginTop={1}>
         <FooterHints hints={hints} />
       </Box>
     </Box>
-  );
-};
+  )
+}
