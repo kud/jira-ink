@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.2.1 — 2026-09-11
+
+### Highlights
+
+- Jira tables render as tables. `@kud/ink-markdown` moved to 0.3.0, which lays a pipe table out as a padded grid with a rule segment under each header column, one line per row and `…` where a cell runs past its column — so a ticket's "Child tickets" or token table no longer arrives as one wrapped run of pipes. The same release lets a link's text carry the `[TAP]`-style brackets Jira puts in it. ([c638268](https://github.com/kud/jira-ink/commit/c638268))
+
 ## 0.2.0 — 2026-09-11
 
 ### Highlights
