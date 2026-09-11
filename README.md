@@ -27,22 +27,50 @@ npm install @kud/jira-ink @kud/jira @kud/ink-ui ink react
 
 ## Usage
 
+A host with a client and a key mounts the self-fetching body — the shape a cockpit wants:
+
+```tsx
+import { createJiraClient, loadConfig } from "@kud/jira"
+import { IssueBody } from "@kud/jira-ink"
+
+const loaded = loadConfig()
+if ("missing" in loaded) throw new Error(loaded.missing.join(", "))
+const client = createJiraClient(loaded.config)
+
+<IssueBody
+  client={client}
+  baseUrl={loaded.config.baseUrl}
+  issueKey="SHOP-1234"
+  onExit={() => setScreen("list")}
+/>
+```
+
+A host that already holds an `IssueDetail` and owns the prompts behind the write verbs — jira-cli's own TUI — mounts the view directly. A verb whose handler is absent is neither hinted nor bound, so a read-only host gets the same screen minus the keys it cannot honour:
+
 ```tsx
 import { IssueDetailView, issueDetailOf } from "@kud/jira-ink"
 
-const detail = issueDetailOf(issue)
+const issue = await issueDetailOf(client, baseUrl, "SHOP-1234")
 
-<IssueDetailView issue={detail} />
+<IssueDetailView
+  issue={issue}
+  width={80}
+  height={30}
+  onBack={back}
+  onTransition={transition}
+  onComment={comment}
+  onAssign={assign}
+  onOpenBrowser={open}
+/>
 ```
 
-Planned exports:
-
-| Export            | What it is                                     |
-| ----------------- | ---------------------------------------------- |
-| `IssueDetailView` | The full issue detail screen                   |
-| `IssueBody`       | The description/comments body of an issue      |
-| `issueDetailOf`   | Maps a `@kud/jira` issue into view-ready shape |
-
+| Export            | What it is                                                               |
+| ----------------- | ------------------------------------------------------------------------ |
+| `IssueBody`       | Self-fetching issue screen: hand it a client and a key, read-only        |
+| `IssueDetailView` | The issue screen over an `IssueDetail`, with optional write verbs        |
+| `issueDetailOf`   | Fetches one issue through a `@kud/jira` client into the view-ready shape |
+| `transitionsOf`   | The issue's available status transitions, `{ id, name, to }`             |
+| `IssueDetail`     | The shape the view reads: strings throughout, ADF already Markdown       |
 ## Development
 
 ```sh
