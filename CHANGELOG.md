@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.4.0 — 2026-09-14
+
+### Highlights
+
+- **The views no longer bind `esc` or `q`.** `IssueDetailView` and `IssueBody` take `onBack` / `onExit` and leave the keys to the host, which mounts `@kud/ink-ui`'s `useAppKeys` once and routes its peel to the view when it is the topmost layer — binding them in both places fired both. Hints say `⌫ back`. A host on 0.3.x that relied on the view closing itself must wire its peel before taking this. ([6aee7b9](https://github.com/kud/jira-ink/commit/6aee7b9fd5a70da9ca40fd389d6143238e1341dd))
+- `@kud/ink-ui` pinned to 0.27.0.
+
+---
+
 ## 0.3.1 — 2026-09-14
 
 ### Highlights
