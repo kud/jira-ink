@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.4.3 — 2026-09-14
+
+### Highlights
+
+- **Shorter action hints on the detail view** — `t move`, `a assign` — so the row fits on one line beside the host's `⌫ back · ? help · q quit` tail at 100 columns instead of wrapping and costing a body row. ([3ccf7c1](https://github.com/kud/jira-ink/commit/3ccf7c1a7ee6ef0d0e5fbde385d0b4c9ed031733))
+
+---
+
 ## 0.4.2 — 2026-09-14
 
 ### Highlights
