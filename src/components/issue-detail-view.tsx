@@ -132,11 +132,15 @@ export const IssueDetailView = ({
         ? attachmentsAsMarkdown(issue)
         : issue.description || "_No description._"
 
-  // The lines the view spends above and below the viewport: the key/value
-  // block and the tabs in both shapes; the title line and the footer only when
-  // the view draws its own chrome. Framed, the host has already paid for those
-  // — and for the `type` row, which the frame's title carries.
-  const chromeLines = frame ? 8 : 12
+  // The lines the view spends above and below the viewport, counted from the
+  // rows it actually draws — the key/value block varies with parent and
+  // labels, and a constant here was one line over with both and three short
+  // with neither, which read as a description that would not fill its space.
+  // Framed, the host has already paid for the title, the footer and the
+  // `type` row the frame's title carries.
+  const keyValueRows =
+    3 + (issue.parent ? 1 : 0) + (issue.labels.length > 0 ? 1 : 0) + (frame ? 0 : 1)
+  const chromeLines = keyValueRows + 1 + 2 + 1 + (frame ? 0 : 4)
   const bodyHeight = Math.max(3, height - chromeLines)
 
   const hints: Hint[] = [
@@ -174,7 +178,10 @@ export const IssueDetailView = ({
         <Tabs items={tabs} active={active ?? "description"} />
       </Box>
 
-      <Box marginTop={1}>
+      {/* Clipped, because a viewport whose last sliced line is a paragraph gap
+          ends its text in a newline and Ink draws that as one extra row —
+          which is where "the description does not fill the space" came from. */}
+      <Box marginTop={1} height={bodyHeight} overflow="hidden">
         <MarkdownViewport
           source={source}
           width={Math.max(20, width - 2)}

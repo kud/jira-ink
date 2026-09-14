@@ -1,3 +1,4 @@
+import { Box, Text } from "ink"
 import { render } from "ink-testing-library"
 import React from "react"
 import { describe, expect, it } from "vitest"
@@ -132,5 +133,41 @@ describe("IssueDetailView, framed", () => {
     expect(frame).not.toContain("browser")
     expect(frame).not.toMatch(/^\s*type/m)
     expect(frame).toContain("In Progress")
+  })
+})
+
+describe("IssueDetailView, framed — the viewport fills what the host gave", () => {
+  const long = Array.from({ length: 60 }, (_, i) => `line ${i + 1}`).join("\n\n")
+  const HOST_ROWS = 3
+  const frame = ({ body }: { body: React.ReactNode }) => (
+    <Box flexDirection="column">
+      <Text>TOP</Text>
+      {body}
+      <Text>FOOT</Text>
+    </Box>
+  )
+
+  const linesOf = (extra: Partial<IssueDetail>, height: number): number => {
+    const { lastFrame } = render(
+      <IssueDetailView
+        issue={issue({ description: long, ...extra })}
+        width={80}
+        height={height}
+        onBack={noop}
+        frame={frame}
+      />,
+    )
+    return (lastFrame() ?? "").split("\n").length
+  }
+
+  it("spends exactly `height` lines whatever the key/value block holds", () => {
+    const bare = linesOf({}, 20)
+    const full = linesOf(
+      { parent: { key: "SHOP-1", summary: "parent" }, labels: ["a", "b"] },
+      20,
+    )
+    // TOP and FOOT are the host's; everything between is the view's `height`.
+    expect(bare - HOST_ROWS + 1).toBe(20)
+    expect(full).toBe(bare)
   })
 })
