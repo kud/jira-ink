@@ -25,4 +25,4 @@ Every screen is a `lib/` half that fetches and shapes (`issueDetailOf`, `boardOf
 
 ## Keys the views do not own
 
-An exported view takes `onBack` and callbacks and **never binds `q`, and never a back key of its own** — the host's key handling routes to it. A view may bind only the keys that open and close layers it pushes itself (a search box, a legend). Otherwise the mounted view and the host both fire on the same key. See kud/ink-ui#5 for the fleet contract.
+An exported view takes `onBack` / `onExit` and callbacks and **never binds `q`, and never a back key of its own** — the host mounts ink-ui's `useAppKeys` once and its peel routes to the view when it is the topmost layer. A view may bind only the keys that open and close layers it pushes itself (a search box, a legend). Otherwise the mounted view and the host both fire on the same key. See kud/ink-ui#5 for the fleet contract.

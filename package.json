@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@kud/ink-markdown": "0.3.0",
-    "@kud/ink-ui": "0.25.0",
+    "@kud/ink-ui": "0.27.0",
     "@kud/jira": "0.4.0"
   },
   "devDependencies": {

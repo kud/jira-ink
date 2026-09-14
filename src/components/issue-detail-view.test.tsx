@@ -128,7 +128,7 @@ describe("IssueDetailView, framed", () => {
     const frame = lastFrame() ?? ""
     expect(seen.title).toBe("SHOP-1234 · Task")
     expect(seen.subtitle).toBe("bring the checkout config under terraform")
-    expect(seen.hints).toEqual(["←→", "↑↓", "o", "esc"])
+    expect(seen.hints).toEqual(["←→", "↑↓", "o", "⌫"])
     expect(frame).not.toContain("SHOP-1234 bring the checkout")
     expect(frame).not.toContain("browser")
     expect(frame).not.toMatch(/^\s*type/m)

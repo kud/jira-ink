@@ -112,8 +112,10 @@ export const IssueDetailView = ({
   const { active } = useTabs(tabs, { initial: "description" })
   const [scroll, setScroll] = useState(0)
 
+  // Esc is not bound here: the back keys are the host's (ink-ui's `useAppKeys`),
+  // whose peel calls `onBack` when this view is the topmost layer. Binding it
+  // here too would fire both.
   useInput((input, key) => {
-    if (key.escape) return onBack()
     if (input === "t" && onTransition) return onTransition()
     if (input === "c" && onComment) return onComment()
     if (input === "a" && onAssign) return onAssign()
@@ -150,7 +152,7 @@ export const IssueDetailView = ({
     ...(onComment ? ([["c", "comment"]] as Hint[]) : []),
     ...(onAssign ? ([["a", "assign to me"]] as Hint[]) : []),
     ...(onOpenBrowser ? ([["o", "browser"]] as Hint[]) : []),
-    ["esc", "back"],
+    ["⌫", "back"],
   ]
 
   // Status is state and stays a badge; type is identity and, framed, moves up
