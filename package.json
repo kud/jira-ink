@@ -1,7 +1,7 @@
 {
   "name": "@kud/jira-ink",
   "version": "0.2.1",
-  "description": "Ink components for viewing Jira issues: the issue detail screen, shared by jira-cli's TUI and cockpit",
+  "description": "Ink components for viewing Jira issues: the board and the issue detail screen, shared by jira-cli's TUI and cockpit",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -29,11 +29,12 @@
     "react": ">=19"
   },
   "dependencies": {
-    "@kud/ink-ui": "0.25.0",
     "@kud/ink-markdown": "0.3.0",
-    "@kud/jira": "0.3.0"
+    "@kud/ink-ui": "0.25.0",
+    "@kud/jira": "0.4.0"
   },
   "devDependencies": {
+    "@kud/cli-testing": "0.1.0",
     "@types/node": "26.5.0",
     "@types/react": "19.2.18",
     "ink": "7.1.1",
