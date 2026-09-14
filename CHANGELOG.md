@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.5.0 — 2026-09-14
+
+### Highlights
+
+- **The board's `frame` slot hands over structured title parts** — `title: { count, user?, scope?, status }` beside the existing `facts` string — so a host drawing `@kud/ink-ui` 0.28's `Page` title row (the cockpit's: count, `@user`, scope, status, dotted rule) gets the segments rather than one string. ([cfd0510](https://github.com/kud/jira-ink/commit/cfd05101a30c3fb394b56138d7eb8edc8071c8ab))
+
+---
+
 ## 0.4.3 — 2026-09-14
 
 ### Highlights
