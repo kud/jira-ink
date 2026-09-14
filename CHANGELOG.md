@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.4.1 — 2026-09-14
+
+### Highlights
+
+- **`IssueBoard` reports search focus.** `onInputFocus(focused)` fires as the `/` box takes and loses focus, so a host can stand its app keys down while `q` is a letter. ([922464f](https://github.com/kud/jira-ink/commit/922464f12ce3e5568c67a4b3461268fd45315d3b))
+
+---
+
 ## 0.4.0 — 2026-09-14
 
 ### Highlights
