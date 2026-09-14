@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.3.1 — 2026-09-14
+
+### Highlights
+
+- **The description now fills the space the host gave it.** The framed detail view counted its chrome as a constant while its key/value block varies with parent and labels, so the Markdown viewport ran one line over with both and three short with neither. It is now counted from the rows actually drawn, and the viewport is clipped to its budget. ([54ac38a](https://github.com/kud/jira-ink/commit/54ac38ad006cb85aaa26f02b717dac760161905c))
+
+---
+
 ## 0.3.0 — 2026-09-14
 
 ### Highlights
