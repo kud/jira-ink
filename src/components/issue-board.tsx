@@ -58,6 +58,11 @@ export type IssueBoardProps = {
     hints: Hint[]
     body: ReactNode
   }) => ReactNode
+  /**
+   * Fires when the search box takes or loses focus, so the host can stand its
+   * app keys down while a letter is a letter — `q` must type there, not quit.
+   */
+  onInputFocus?: (focused: boolean) => void
 }
 
 // Lines the board spends around the rows inside the host's frame: the blank
@@ -125,6 +130,7 @@ export const IssueBoard = ({
   onSearch,
   onClearSearch,
   frame,
+  onInputFocus,
 }: IssueBoardProps) => {
   const [legend, setLegend] = useState(false)
   const [search, setSearch] = useState<SearchBox>({
@@ -138,6 +144,10 @@ export const IssueBoard = ({
     const tick = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(tick)
   }, [])
+
+  useEffect(() => {
+    onInputFocus?.(search.open)
+  }, [search.open, onInputFocus])
 
   // Plain words narrow the loaded rows as they are typed; the server search
   // on enter only ever widens that (it also reads comments), so nothing
