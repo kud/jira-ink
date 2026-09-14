@@ -265,8 +265,6 @@ export const IssueBoard = ({
             ? [["x", "clear"] as Hint]
             : [["a", showingAll ? "recent only" : "everything"] as Hint]),
           ["r", "refresh"],
-          ["?", "legend"],
-          ["q", "quit"],
         ]
 
   const emptyHint = (): string => {

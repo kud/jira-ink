@@ -77,7 +77,7 @@ describe("IssueBoard", () => {
     await r.waitFor("SHOP-412")
     const f = r.lastFrame()
     expect(f).toContain("TITLE 7 items · @Ada Okafor · updated")
-    expect(f).toMatch(/HINTS .*q$/m)
+    expect(f).toMatch(/HINTS ↑↓,←→,enter,\/,a,r$/m)
     r.unmount()
   })
 
