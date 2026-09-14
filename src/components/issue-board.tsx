@@ -54,7 +54,20 @@ export type IssueBoardProps = {
    * what a test or an embedded pane wants.
    */
   frame?: (parts: {
+    /** One string for a host with a plain title row. */
     facts: string
+    /**
+     * The same facts as segments, for a host drawing ink-ui's `Page` title
+     * row: how many rows the board holds (or `N of M` while narrowing),
+     * who the `mine` scope belongs to, the search as a further scope, and
+     * freshness as a quiet status.
+     */
+    title: {
+      count: number
+      user?: string
+      scope?: string
+      status: { text: string; tone: "quiet" }
+    }
     hints: Hint[]
     body: ReactNode
   }) => ReactNode
@@ -246,7 +259,18 @@ export const IssueBoard = ({
     search.open && narrowed.length !== model.rows.length
       ? `${narrowed.length} of ${model.rows.length}`
       : `${model.rows.length} ${model.rows.length === 1 ? "item" : "items"}`
-  const facts = `${countLabel} · ${scopeLabel} · updated ${relativeAge(new Date(loadedAt).toISOString(), now)} ago`
+  const updated = `updated ${relativeAge(new Date(loadedAt).toISOString(), now)} ago`
+  const facts = `${countLabel} · ${scopeLabel} · ${updated}`
+  const title = {
+    count: search.open && narrowed.length !== model.rows.length ? narrowed.length : model.rows.length,
+    ...(scope.kind === "mine" ? { user: viewer } : {}),
+    ...(scope.kind === "search"
+      ? { scope: scope.mode === "jql" ? "jql" : `“${scope.query}”` }
+      : search.open && narrowed.length !== model.rows.length
+        ? { scope: `of ${model.rows.length}` }
+        : {}),
+    status: { text: updated, tone: "quiet" as const },
+  }
 
   const hints: Hint[] = search.open
     ? [
@@ -415,7 +439,7 @@ export const IssueBoard = ({
     </>
   )
 
-  if (frame) return frame({ facts, hints, body })
+  if (frame) return frame({ facts, title, hints, body })
   return (
     <Box flexDirection="column">
       <Text dimColor>{facts}</Text>
