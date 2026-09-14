@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.3.0 — 2026-09-14
+
+### Highlights
+
+- The tabbed issue board moves here from jira-cli: `IssueBoard` groups rows under their epic, with container rows heading each group, a type pill, priority glyph and age column, `/` search over plain words or JQL, and `?` for the legend. A `frame` slot lets the host own the chrome, and the view binds no `q` or back key of its own. ([e93b930](https://github.com/kud/jira-ink/commit/e93b930))
+- `boardOf` resolves tabs through three sources in order — configured tabs, board columns matched by status id, then status categories — with a derived "Off board" tab for anything none of them claim. ([e93b930](https://github.com/kud/jira-ink/commit/e93b930))
+- `toBoardRow`, `blocksFor`, the glyph helpers, and `mockBoard` are now exported, so a host can build its own board rendering or tests against the same data. ([e93b930](https://github.com/kud/jira-ink/commit/e93b930))
+- `@kud/jira` pinned to 0.4.0 for the board config support this relies on. ([e93b930](https://github.com/kud/jira-ink/commit/e93b930))
+
+---
+
 ## 0.2.1 — 2026-09-11
 
 ### Highlights
