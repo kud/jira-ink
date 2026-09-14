@@ -148,9 +148,9 @@ export const IssueDetailView = ({
   const hints: Hint[] = [
     ["←→", "section"],
     ["↑↓", "scroll"],
-    ...(onTransition ? ([["t", "transition"]] as Hint[]) : []),
+    ...(onTransition ? ([["t", "move"]] as Hint[]) : []),
     ...(onComment ? ([["c", "comment"]] as Hint[]) : []),
-    ...(onAssign ? ([["a", "assign to me"]] as Hint[]) : []),
+    ...(onAssign ? ([["a", "assign"]] as Hint[]) : []),
     ...(onOpenBrowser ? ([["o", "browser"]] as Hint[]) : []),
     ["⌫", "back"],
   ]

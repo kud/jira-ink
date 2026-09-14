@@ -53,8 +53,8 @@ describe("IssueDetailView", () => {
     )
     const frame = readOnly.lastFrame() ?? ""
     expect(frame).toContain("browser")
-    expect(frame).not.toContain("transition")
-    expect(frame).not.toContain("assign to me")
+    expect(frame).not.toContain("t move")
+    expect(frame).not.toContain("a assign")
     expect(frame).not.toContain("comment")
 
     const full = render(
@@ -70,8 +70,8 @@ describe("IssueDetailView", () => {
       />,
     )
     const fullFrame = full.lastFrame() ?? ""
-    expect(fullFrame).toContain("transition")
-    expect(fullFrame).toContain("assign to me")
+    expect(fullFrame).toContain("t move")
+    expect(fullFrame).toContain("a assign")
   })
 
   it("counts comments and attachments on their tabs", () => {
