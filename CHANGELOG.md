@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.4.2 — 2026-09-14
+
+### Highlights
+
+- **The board's hints no longer carry `? legend` or `q quit`.** Those are the footer tail every page ends with, drawn by the host's frame from ink-ui's `FooterHints` `page` prop; the board hands over only its own keys. ([e525d37](https://github.com/kud/jira-ink/commit/e525d37df2b47125d093f21ab74ac2527d0322be))
+
+---
+
 ## 0.4.1 — 2026-09-14
 
 ### Highlights
