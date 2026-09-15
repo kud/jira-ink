@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.7.0 — 2026-09-15
+
+### Highlights
+
+- **The priority cell now ranks against the scheme's default rung, in Jira's own arrow grammar** — `⇈` two above, `↑` one above, `=` at the default, `↓` one below, `⇊` two below — instead of a two-ends `▲` / `▼` with nothing in between. On a four-rung scheme (P1–P4, the common shape) the old marker put a mark on half the rows, drew P2 as if it were normal, and left P3 and P4 identical; worse, a blank beside a marked row read as _missing_ rather than _normal_. `=` now says "we looked, it is normal" — the blank means only a priority that's absent or can't be placed. Name mapping: Highest/Blocker/Critical/P0/P1 → `⇈`, High/Urgent/Major/P2 → `↑`, Medium/Normal/P3 → `=`, Low/Minor/P4 → `↓`, Lowest/Trivial/P5 → `⇊`; deriving rank from the instance's own ordered priority list is the honest next step, names stay the fallback. `priorityGlyph` returns the new exported `PriorityGlyph` union, `priorityMarker` colours up marks `colors.warning`, down marks `colors.info`, and `=` `colors.muted`, and the board's legend has been updated to match. **Breaking:** a host on 0.6.0 that matched `▲` / `▼` by string must move to the new glyph set. ([d67116e](https://github.com/kud/jira-ink/commit/d67116ea7fbead5b7edcd348f753d87dcf7db213))
+
+---
+
 ## 0.6.0 — 2026-09-15
 
 ### Highlights
