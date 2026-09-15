@@ -46,6 +46,12 @@ export type IssueBodyProps = {
   /** Instance URL, as `loadConfig` resolves it; only used to build the browser link. */
   baseUrl: string
   issueKey: string
+  /**
+   * The summary as the host already knows it — from the list row that was
+   * opened — so the frame carries the title from the first frame rather than
+   * only once the fetch answers. The fetched summary wins once it is here.
+   */
+  summary?: string
   onExit: () => void
   /** Override the terminal-derived size when the host draws inside a frame. */
   width?: number
@@ -69,6 +75,7 @@ export const IssueBody = ({
   client,
   baseUrl,
   issueKey,
+  summary,
   onExit,
   width,
   height,
@@ -104,12 +111,12 @@ export const IssueBody = ({
   // The frame goes up before the fetch answers, so a host sees the same panel
   // through loading, error and ready rather than a bare spinner that snaps
   // into a border a second later. The type is not known yet, so the title is
-  // the key alone.
+  // the key alone; the summary is whatever the host already had.
   const framed = (body: ReactNode): ReactNode =>
     frame
       ? frame({
           title: issueKey,
-          subtitle: "",
+          subtitle: summary ?? "",
           hints: [["⌫", "back"]],
           body,
         })

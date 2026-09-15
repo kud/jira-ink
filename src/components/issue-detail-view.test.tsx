@@ -55,7 +55,8 @@ describe("IssueDetailView", () => {
     expect(frame).toContain("browser")
     expect(frame).not.toContain("t move")
     expect(frame).not.toContain("a assign")
-    expect(frame).not.toContain("comment")
+    // The facts line says "0 comments"; the hint would say "c comment".
+    expect(frame).not.toContain("c comment")
 
     const full = render(
       <IssueDetailView
@@ -74,7 +75,7 @@ describe("IssueDetailView", () => {
     expect(fullFrame).toContain("a assign")
   })
 
-  it("counts comments and attachments on their tabs", () => {
+  it("counts comments and attachments in the facts line, and draws them below", () => {
     const { lastFrame } = render(
       <IssueDetailView
         issue={issue({
@@ -98,7 +99,37 @@ describe("IssueDetailView", () => {
         onBack={noop}
       />,
     )
-    expect(lastFrame() ?? "").toMatch(/Comments.*2/)
+    const frame = lastFrame() ?? ""
+    expect(frame).toContain("2 comments")
+    // One document, not tabs: the comments follow the description under
+    // their own heading, each with its author.
+    expect(frame).toContain("Comments (2)")
+    expect(frame).toMatch(/Sam Example ·/)
+    expect(frame).not.toContain("Description")
+  })
+
+  // Priority leads the facts line and is its one bright cell — but only when
+  // it is placed away from the default, since "normal" is not news.
+  it("leads the facts line with a priority worth saying", () => {
+    const high = render(
+      <IssueDetailView
+        issue={issue({ priority: "High" })}
+        width={80}
+        height={30}
+        onBack={noop}
+      />,
+    ).lastFrame()
+    expect(high).toContain("↑ High · by Alex Example")
+    const medium = render(
+      <IssueDetailView
+        issue={issue({ priority: "Medium" })}
+        width={80}
+        height={30}
+        onBack={noop}
+      />,
+    ).lastFrame()
+    expect(medium).not.toContain("Medium")
+    expect(medium).toContain("by Alex Example")
   })
 })
 
@@ -128,7 +159,7 @@ describe("IssueDetailView, framed", () => {
     const frame = lastFrame() ?? ""
     expect(seen.title).toBe("SHOP-1234 · Task")
     expect(seen.subtitle).toBe("bring the checkout config under terraform")
-    expect(seen.hints).toEqual(["←→", "↑↓", "o", "⌫"])
+    expect(seen.hints).toEqual(["↑↓", "o", "⌫"])
     expect(frame).not.toContain("SHOP-1234 bring the checkout")
     expect(frame).not.toContain("browser")
     expect(frame).not.toMatch(/^\s*type/m)

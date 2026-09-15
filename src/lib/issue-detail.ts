@@ -20,6 +20,8 @@ export type IssueDetail = {
   assignee: string;
   reporter: string;
   labels: string[];
+  /** Jira's priority name, verbatim; absent when the field is off. */
+  priority?: string;
   parent?: { key: string; summary: string };
   url: string;
   description: string;
@@ -48,6 +50,7 @@ export const issueDetailOf = async (
     assignee: f.assignee?.displayName ?? "unassigned",
     reporter: f.reporter?.displayName ?? "—",
     labels: f.labels ?? [],
+    ...(f.priority?.name ? { priority: f.priority.name } : {}),
     parent: f.parent
       ? { key: f.parent.key, summary: f.parent.fields?.summary ?? "" }
       : undefined,
@@ -56,7 +59,7 @@ export const issueDetailOf = async (
     comments: (f.comment?.comments ?? []).map((c) => ({
       id: c.id,
       author: c.author?.displayName ?? "unknown",
-      created: c.created?.slice(0, 10) ?? "",
+      created: c.created ?? "",
       body: adfToMarkdown(c.body, filenameOf),
     })),
     attachments,
