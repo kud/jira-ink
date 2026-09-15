@@ -235,14 +235,21 @@ describe("grouping by parent", () => {
 })
 
 describe("row glyphs", () => {
-  it("marks only the two ends of priority, P-ladder included", () => {
-    expect(priorityGlyph("Highest")).toBe("▲")
-    expect(priorityGlyph("P1")).toBe("▲")
-    expect(priorityGlyph("Medium")).toBe(" ")
-    expect(priorityGlyph("P2")).toBe(" ")
-    expect(priorityGlyph("Low")).toBe("▼")
-    expect(priorityGlyph("P4")).toBe("▼")
+  it("ranks a priority against the default rung, P-ladder included", () => {
+    // Five rungs, in Jira's own arrow grammar, and the default rung gets a
+    // glyph of its own — a blank beside a marked row read as MISSING, not as
+    // normal. Only a priority we cannot place stays blank.
+    expect(priorityGlyph("Highest")).toBe("⇈")
+    expect(priorityGlyph("P1")).toBe("⇈")
+    expect(priorityGlyph("High")).toBe("↑")
+    expect(priorityGlyph("P2")).toBe("↑")
+    expect(priorityGlyph("Medium")).toBe("=")
+    expect(priorityGlyph("P3")).toBe("=")
+    expect(priorityGlyph("Low")).toBe("↓")
+    expect(priorityGlyph("P4")).toBe("↓")
+    expect(priorityGlyph("Lowest")).toBe("⇊")
     expect(priorityGlyph(null)).toBe(" ")
+    expect(priorityGlyph("Whenever")).toBe(" ")
   })
 
   it("renders age in the largest whole unit", () => {

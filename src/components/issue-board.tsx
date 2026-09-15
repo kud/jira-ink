@@ -83,8 +83,9 @@ export type IssueBoardProps = {
 const CHROME = 6
 
 const LEGEND: [string, string][] = [
-  ["▲", "high priority"],
-  ["▼", "low priority"],
+  ["⇈ ↑", "priority above the default"],
+  ["=", "default priority"],
+  ["↓ ⇊", "priority below the default"],
   ["── epic ──", "a parent not in this tab; its rows hang beneath"],
   ["└─", "a row under the container above it"],
   ["story · bug · task", "issue type"],

@@ -31,6 +31,7 @@ export {
   OFF_BOARD,
   pillVariantFor,
   priorityGlyph,
+  type PriorityGlyph,
   relativeAge,
   tabOf,
   tabsFromBoard,

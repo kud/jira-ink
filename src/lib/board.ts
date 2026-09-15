@@ -240,16 +240,32 @@ export const blockIndexOfIssue = (
 
 // ─── row glyphs ───────────────────────────────────────────────────────────────
 
+export type PriorityGlyph = "⇈" | "↑" | "=" | "↓" | "⇊" | " "
+
 /**
- * Priority names are per-instance, so this matches the default scheme, the
- * common renames and the P0–P4 ladder rather than an exact list. Medium — or
- * anything unrecognised — draws nothing: the glyph column marks the two ends
- * only.
+ * Rank against the scheme's default rung, in Jira's own arrow grammar: two
+ * rungs above draws `⇈`, one `↑`, the default `=`, one below `↓`, two `⇊`.
+ *
+ * Five glyphs, not three, and the normal rung gets one. The column used to
+ * mark the two ends only (`▲` / `▼`, nothing for normal), which on a four-rung
+ * scheme — P1 to P4, the common shape — put a mark on half the rows, drew P2
+ * as if it were normal, and made P3 and P4 identical. And a blank beside a
+ * marked row read as MISSING rather than as normal: the absent-vs-zero
+ * distinction, one glyph at a time. So `=` says "we looked, it is normal",
+ * and the blank finally means only "no priority, or one we cannot place".
+ *
+ * Names are per-instance, so this matches the default scheme, the common
+ * renames and the P0–P5 ladder rather than an exact list. Deriving rank from
+ * the instance's ordered priority list, with its default flag, is the honest
+ * version of this and where it goes next; the names are the fallback.
  */
-export const priorityGlyph = (name: string | null): "▲" | "▼" | " " => {
+export const priorityGlyph = (name: string | null): PriorityGlyph => {
   const n = (name ?? "").trim().toLowerCase()
-  if (/highest|high|critical|blocker|urgent|^p[01]$/.test(n)) return "▲"
-  if (/lowest|low|minor|trivial|^p[3-5]$/.test(n)) return "▼"
+  if (/^(highest|blocker|critical|p[01])$/.test(n)) return "⇈"
+  if (/^(high|urgent|major|p2)$/.test(n)) return "↑"
+  if (/^(medium|normal|p3)$/.test(n)) return "="
+  if (/^(low|minor|p4)$/.test(n)) return "↓"
+  if (/^(lowest|trivial|p5)$/.test(n)) return "⇊"
   return " "
 }
 
