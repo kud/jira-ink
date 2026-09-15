@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.8.0 — 2026-09-15
+
+### Highlights
+
+- **`IssueDetailView` drops its three tabs for one continuous document.** Description, Comments, and Attachments were each a Markdown viewport scrolled with the same ↑↓ keys — nothing about them distinguished a place to act from a place to look, and a tab is supposed to be the former. The ticket now reads top to bottom: the description, then `## Comments (N)` with each comment under `**author** · 3d ago`, then `## Attachments (N)` as an appendix. The header becomes rows worth acting on — `status` (as a badge) leads, because it's the one fact that can be wrong on you; `assignee` follows (`unassigned` shown dim); then `parent`, its key in the secondary tier with the summary beside it. Below that sits a dim facts line — priority leads as the one bright cell (its glyph in colour plus the name, earned only by sitting away from the default), then `by reporter`, `labels …`, `N comments`, `N attachments`; reporter and labels have moved off the header rows onto this line. `←→` are unbound now there's nothing left to switch between — the hints read `↑↓ scroll` plus the wired verbs and `⌫ back`. `IssueDetail` gains `priority?: string`, and `comments[].created` now carries the full ISO timestamp rather than being truncated to the date. `IssueBody` takes an optional `summary` prop so a host that already knows the title from its list row can show it from the first frame instead of after the fetch. Designed with the room's designer: "a tab survives only if its panel owns keys the other cannot share." ([0b56fc6](https://github.com/kud/jira-ink/commit/0b56fc69307814153cc6f72ace83aa679599f364))
+
+---
+
 ## 0.7.0 — 2026-09-15
 
 ### Highlights
