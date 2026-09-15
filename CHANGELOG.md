@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.5.2 — 2026-09-15
+
+### Highlights
+
+- **`@kud/ink-markdown` moves to 0.3.1, which renders a theme colour given as a hex.** A host passing its own tokens through the `theme` prop — cockpit's ticket drill hands orange links and cyan inline code — had them silently dropped; they now show. Nothing changes for a host on the default theme. ([064c71f](https://github.com/kud/jira-ink/commit/064c71fa4ba5c14e14fed2baea31a5d43bd27deb))
+
+---
+
 ## 0.5.1 — 2026-09-15
 
 ### Highlights
