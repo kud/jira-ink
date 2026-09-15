@@ -184,7 +184,7 @@ export const IssueBoard = ({
   const listFocused = !search.open && !legend
   const initial =
     shown.find((t) => t.category === "indeterminate")?.value ?? shown[0]?.value
-  const { active, setActive } = useTabs(tabItems, {
+  const { active } = useTabs(tabItems, {
     initial,
     isActive: listFocused,
   })
@@ -218,14 +218,6 @@ export const IssueBoard = ({
       return
     }
     if (key.return && issues[cursor]) onOpen(issues[cursor].row.key)
-    // ←→ have no other job on this screen, so they move the tab as well as ⇥
-    // — the ring is still the hook's; this only asks it to step.
-    if ((key.leftArrow || key.rightArrow) && tabItems.length) {
-      const at = tabItems.findIndex((t) => t.value === tab)
-      const next =
-        (at + (key.leftArrow ? -1 : 1) + tabItems.length) % tabItems.length
-      setActive(tabItems[next]!.value)
-    }
     if (input === "/")
       setSearch((s) => ({
         ...s,

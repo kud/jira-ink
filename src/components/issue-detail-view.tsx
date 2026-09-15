@@ -120,9 +120,9 @@ export const IssueDetailView = ({
     if (input === "c" && onComment) return onComment()
     if (input === "a" && onAssign) return onAssign()
     if (input === "o" && onOpenBrowser) return onOpenBrowser()
-    // ←→ belong to useTabs; only vertical movement is ours to handle. ← used
-    // to ALSO fire onBack here, one line above the hint promising it switches
-    // sections — both handlers ran, and the unmount won.
+    // ←→ are useTabs's (since @kud/ink-ui 0.29); only vertical movement is ours
+    // to handle. ← used to ALSO fire onBack here, one line above the hint
+    // promising it switches sections — both handlers ran, and the unmount won.
     if (key.downArrow || input === "j") setScroll((s) => s + 1)
     if (key.upArrow || input === "k") setScroll((s) => Math.max(0, s - 1))
   })
