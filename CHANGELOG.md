@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.6.0 — 2026-09-15
+
+### Highlights
+
+- **The priority cell is now a single exported function.** `priorityMarker(name) → { marker: "▲" | "▼" | " ", color? }` returns the glyph and colour together, exactly as `IssueBoard` draws it — `colors.warning` for the high end, `colors.muted` for the low, no colour for the blank one-column case — and the board now draws through it instead of its own inline logic. A host that draws its own rows (cockpit, via gh-ink's `TaskRow.marker` / `markerColor`) previously had no way to match the board's cell short of a private table that could drift out of step; one shared site means the two can no longer disagree on a hue. `priorityGlyph` stays as the pure half, for a host that wants the glyph without the colour. ([631ec51](https://github.com/kud/jira-ink/commit/631ec510705efb71492733d16daffa817ccec63b))
+
+---
+
 ## 0.5.2 — 2026-09-15
 
 ### Highlights
