@@ -18,7 +18,6 @@ import {
   blocksFor,
   countsFor,
   pillVariantFor,
-  priorityGlyph,
   relativeAge,
   tabOf,
   visibleTabs,
@@ -26,6 +25,7 @@ import {
   type BoardModel,
   type BoardTab,
 } from "../lib/board.js"
+import { priorityMarker } from "./priority-marker.js"
 
 /** What the board is showing, named in the title row. */
 export type BoardScope =
@@ -389,14 +389,8 @@ export const IssueBoard = ({
                   </Box>
                 ) : null}
                 <Box flexShrink={0} width={2}>
-                  <Text
-                    color={
-                      priorityGlyph(block.row.priority) === "▲"
-                        ? colors.warning
-                        : colors.muted
-                    }
-                  >
-                    {priorityGlyph(block.row.priority)}
+                  <Text color={priorityMarker(block.row.priority).color}>
+                    {priorityMarker(block.row.priority).marker}
                   </Text>
                 </Box>
                 <Box flexShrink={0} width={keyWidth + 2}>

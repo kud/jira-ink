@@ -20,6 +20,10 @@ export {
   type IssueBoardProps,
 } from "./components/issue-board.js"
 export {
+  priorityMarker,
+  type PriorityMarker,
+} from "./components/priority-marker.js"
+export {
   blockIndexOfIssue,
   blocksFor,
   boardOf,
