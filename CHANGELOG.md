@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.5.1 — 2026-09-15
+
+### Highlights
+
+- **`@kud/ink-ui` moves to 0.29.0, whose `useTabs` binds `←→` itself.** The detail view's `←→ section` hint has been true in wording only since it shipped — the arrows did nothing. They now switch sections, and the board drops the hand-bound arrow handler it carried instead, which would otherwise have fired alongside the hook's and switched tabs twice per press. Both directions wrap, as `Tab` already did. ([de072a5](https://github.com/kud/jira-ink/commit/de072a5bc0b151b6f84f522d8e560f487e42aae8))
+
+---
+
 ## 0.5.0 — 2026-09-14
 
 ### Highlights
