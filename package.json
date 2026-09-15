@@ -29,7 +29,7 @@
     "react": ">=19"
   },
   "dependencies": {
-    "@kud/ink-markdown": "0.3.0",
+    "@kud/ink-markdown": "0.3.1",
     "@kud/ink-ui": "0.29.0",
     "@kud/jira": "0.4.0"
   },
