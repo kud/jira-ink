@@ -637,7 +637,7 @@ describe("parentsOf", () => {
     ({ key, fields: { summary: key, assignee: { displayName: "Priya Raman" } } }) as JiraIssue
 
   it("asks once for every parent the board holds no row for, and never twice for one", async () => {
-    const searchIssues = vi.fn(async () => [issue("SHOP-350")])
+    const searchIssues = vi.fn(async (_jql: string) => [issue("SHOP-350")])
     const rows = [
       row({ key: "A-1", parent: { key: "SHOP-350", summary: "Storefront" } }),
       row({ key: "A-2", parent: { key: "SHOP-350", summary: "Storefront" } }),
