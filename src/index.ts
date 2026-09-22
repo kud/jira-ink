@@ -18,6 +18,7 @@ export {
   IssueBoard,
   type BoardLeaves,
   type BoardScope,
+  type CursorAt,
   type IssueBoardProps,
 } from "./components/issue-board.js"
 export {

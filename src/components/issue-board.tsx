@@ -24,9 +24,11 @@ import {
   pillVariantFor,
   relativeAge,
   stopsOf,
+  subtreeOf,
   treePrefix,
   tabOf,
   visibleTabs,
+  type Block,
   type BoardRow,
   type Stop,
   type BoardModel,
@@ -50,6 +52,13 @@ export type BoardLeaves<L> = {
   keyOf: (leaf: L) => string
   render: (leaf: L, ctx: { active: boolean; width: number }) => ReactNode
   onOpen: (leaf: L) => void
+}
+
+/** The stop under the cursor, and everything hanging off it. */
+export type CursorAt<L> = {
+  stop: Stop<L>
+  /** The stop and its descendants, as `subtreeOf` reads them. */
+  subtree: Block<L>[]
 }
 
 export type IssueBoardProps<L = never> = {
@@ -104,6 +113,18 @@ export type IssueBoardProps<L = never> = {
    * app keys down while a letter is a letter — `q` must type there, not quit.
    */
   onInputFocus?: (focused: boolean) => void
+  /**
+   * Where the cursor is, for a host that binds keys of its own — a move menu,
+   * or `C` / `O` over everything hanging off the row.
+   *
+   * The board owns the cursor, so a host that wanted to act on the selected
+   * row had no way to learn which one it was: `onOpen` answers only on ↵. The
+   * subtree comes with it rather than as a second call, because the host has
+   * no handle on `blocks` to walk it from.
+   *
+   * `null` while a tab holds nothing.
+   */
+  onCursor?: (at: CursorAt<L> | null) => void
 }
 
 // Lines the board spends around the rows inside the host's frame: the blank
@@ -216,6 +237,7 @@ export const IssueBoard = <L = never,>({
   onClearSearch,
   frame,
   onInputFocus,
+  onCursor,
 }: IssueBoardProps<L>) => {
   const [legend, setLegend] = useState(false)
   const [search, setSearch] = useState<SearchBox>({
@@ -282,6 +304,13 @@ export const IssueBoard = <L = never,>({
     isActive: listFocused,
   })
   useEffect(() => setCursor(0), [tab, setCursor])
+
+  const at = stops[cursor]
+  useEffect(() => {
+    onCursor?.(
+      at ? { stop: at, subtree: subtreeOf(blocks, blockIndexOfStop(blocks, cursor)) } : null,
+    )
+  }, [at, blocks, cursor, onCursor])
 
   const openStop = (stop: Stop<L> | undefined) => {
     if (!stop) return

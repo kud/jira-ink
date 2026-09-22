@@ -210,6 +210,42 @@ describe("IssueBoard", () => {
     r.unmount()
   })
 
+  it("reports the cursor and its subtree, so a host can bind keys of its own", async () => {
+    const seen: string[][] = []
+    const r = mount({
+      leaves: {
+        under: (row) => (row.key === "SHOP-412" ? ["#128"] : []),
+        keyOf: (l) => l,
+        render: (l) => <Text>{`PR ${l}`}</Text>,
+        onOpen: vi.fn(),
+      },
+      onCursor: (at) =>
+        seen.push(
+          at
+            ? at.subtree.map((b) =>
+                b.kind === "leaf"
+                  ? String(b.data)
+                  : b.kind === "issue"
+                    ? b.row.key
+                    : b.kind,
+              )
+            : [],
+        ),
+    })
+    await r.waitFor("#128")
+    // The epic heads this tab, so the first report carries the whole group.
+    expect(seen[seen.length - 1]).toEqual([
+      "SHOP-300",
+      "SHOP-412",
+      "#128",
+      "SHOP-401",
+    ])
+    r.write(DOWN)
+    await settle()
+    expect(seen[seen.length - 1]).toEqual(["SHOP-412", "#128"])
+    r.unmount()
+  })
+
   it("points an empty tab at the ones that have rows", async () => {
     const model = mockBoard()
     model.rows = model.rows.filter((r) => r.category === "new")
