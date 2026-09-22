@@ -172,16 +172,45 @@ export const visibleTabs = (
  * with no parent — and each group after the first is preceded by a blank
  * line. A tab where nothing has a parent and nothing is a container degrades
  * to a plain list, never to a lone fence.
+ *
+ * A LEAF is something the host hangs under a row that is not a Jira issue —
+ * cockpit hangs a task's pull requests there. The board never looks inside
+ * one: `L` is opaque, the host renders it and opens it. A leaf sits one
+ * level under its row, directly beneath it and before any children, so a
+ * row's subtree is always one contiguous run. Leaves are cursor stops like
+ * issues; fences and gaps never are.
  */
-export type Block =
+export type Block<L = never> =
   | { kind: "gap" }
   | { kind: "fence"; key: string | null; summary: string }
   | { kind: "issue"; row: BoardRow; depth: 0 | 1 }
+  | { kind: "leaf"; parent: BoardRow; depth: 1 | 2; data: L }
 
-export const blocksFor = (rows: BoardRow[]): Block[] => {
+export type Stop<L = never> = Extract<Block<L>, { kind: "issue" | "leaf" }>
+
+export const isStop = <L>(block: Block<L>): block is Stop<L> =>
+  block.kind === "issue" || block.kind === "leaf"
+
+/** The rows and leaves in cursor order — what ↑↓ walks and ↵ opens. */
+export const stopsOf = <L>(blocks: Block<L>[]): Stop<L>[] =>
+  blocks.filter(isStop)
+
+export const blocksFor = <L = never>(
+  rows: BoardRow[],
+  under?: (row: BoardRow) => L[],
+): Block<L>[] => {
+  const withLeaves = (row: BoardRow, depth: 0 | 1): Block<L>[] => [
+    { kind: "issue", row, depth },
+    ...(under?.(row) ?? []).map((data): Block<L> => ({
+      kind: "leaf",
+      parent: row,
+      depth: depth === 0 ? 1 : 2,
+      data,
+    })),
+  ]
+
   const hasStructure = rows.some((r) => r.parent || r.container)
-  if (!hasStructure)
-    return rows.map((row) => ({ kind: "issue", row, depth: 0 }))
+  if (!hasStructure) return rows.flatMap((row) => withLeaves(row, 0))
 
   const heads = new Map(rows.filter((r) => r.container).map((r) => [r.key, r]))
   const children = new Map<string, BoardRow[]>()
@@ -196,46 +225,95 @@ export const blocksFor = (rows: BoardRow[]): Block[] => {
     children.set(key, [...(children.get(key) ?? []), row])
   }
 
-  const groups: Block[][] = []
+  const groups: Block<L>[][] = []
   for (const [key, head] of heads)
     groups.push([
-      { kind: "issue", row: head, depth: 0 },
-      ...(children.get(key) ?? []).map((row): Block => ({
-        kind: "issue",
-        row,
-        depth: 1,
-      })),
+      ...withLeaves(head, 0),
+      ...(children.get(key) ?? []).flatMap((row) => withLeaves(row, 1)),
     ])
   for (const [key, kids] of children) {
     if (heads.has(key)) continue
     groups.push([
       { kind: "fence", key, summary: kids[0]!.parent?.summary ?? "" },
-      ...kids.map((row): Block => ({ kind: "issue", row, depth: 1 })),
+      ...kids.flatMap((row) => withLeaves(row, 1)),
     ])
   }
   if (orphans.length)
     groups.push([
       ...(groups.length
-        ? [{ kind: "fence", key: null, summary: "No epic" } as Block]
+        ? [{ kind: "fence", key: null, summary: "No epic" } as Block<L>]
         : []),
-      ...orphans.map((row): Block => ({ kind: "issue", row, depth: 0 })),
+      ...orphans.flatMap((row) => withLeaves(row, 0)),
     ])
 
   return groups.flatMap((group, i) =>
-    i === 0 ? group : [{ kind: "gap" } as Block, ...group],
+    i === 0 ? group : [{ kind: "gap" } as Block<L>, ...group],
   )
 }
 
-/** Index into `blocks` of the n-th issue, so a cursor over issues maps to a line. */
-export const blockIndexOfIssue = (
-  blocks: Block[],
-  issueIndex: number,
+/** Index into `blocks` of the n-th stop, so a cursor over stops maps to a line. */
+export const blockIndexOfStop = <L>(
+  blocks: Block<L>[],
+  stopIndex: number,
 ): number => {
   let seen = -1
   for (let i = 0; i < blocks.length; i++) {
-    if (blocks[i]!.kind === "issue" && ++seen === issueIndex) return i
+    if (isStop(blocks[i]!) && ++seen === stopIndex) return i
   }
   return 0
+}
+
+/**
+ * Whether the stop at `i` is the last among its siblings — the stops at its
+ * depth before the tree returns to a shallower one or the group ends. Rows
+ * and leaves count together, so an epic's own leaves and its children share
+ * one run.
+ */
+const isLastAtDepth = <L>(blocks: Block<L>[], i: number): boolean => {
+  const depth = (blocks[i] as Stop<L>).depth
+  for (let j = i + 1; j < blocks.length; j++) {
+    const b = blocks[j]!
+    if (!isStop(b) || b.depth < depth) return true
+    if (b.depth === depth) return false
+  }
+  return true
+}
+
+/**
+ * The tree glyphs to the left of the stop at `i`, three columns per level:
+ * `├─ ` while a sibling still follows, `└─ ` for the last, and ahead of a
+ * depth-2 connector a `│  ` stem while its parent is not last. A `└─` on
+ * every child was tried in gh-ink and rejected — three closing corners in a
+ * column draw no tree at all — which is why last-ness is tracked here
+ * rather than left to the renderer.
+ */
+export const treePrefix = <L>(blocks: Block<L>[], i: number): string => {
+  const block = blocks[i]
+  if (!block || !isStop(block) || block.depth === 0) return ""
+  const own = isLastAtDepth(blocks, i) ? "└─ " : "├─ "
+  if (block.depth === 1) return own
+  let parent = i - 1
+  while (parent >= 0 && (blocks[parent] as Stop<L>).depth !== 1) parent -= 1
+  const stem = parent >= 0 && !isLastAtDepth(blocks, parent) ? "│  " : "   "
+  return stem + own
+}
+
+/**
+ * The block at `i` and everything hanging under it: a row's own leaves, its
+ * children and theirs. Pure, so a host can walk a subtree for every URL in
+ * it (`C` / `O`) without knowing how the tree was laid out. A leaf, a fence
+ * or a gap has no subtree beyond itself.
+ */
+export const subtreeOf = <L>(blocks: Block<L>[], i: number): Block<L>[] => {
+  const head = blocks[i]
+  if (!head || head.kind !== "issue") return head ? [head] : []
+  const out: Block<L>[] = [head]
+  for (let j = i + 1; j < blocks.length; j++) {
+    const b = blocks[j]!
+    if (!isStop(b) || b.depth <= head.depth) break
+    out.push(b)
+  }
+  return out
 }
 
 // ─── row glyphs ───────────────────────────────────────────────────────────────

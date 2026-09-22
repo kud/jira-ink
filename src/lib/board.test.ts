@@ -1,19 +1,22 @@
 import type { JiraClient, JiraIssue } from "@kud/jira"
 import { describe, expect, it, vi } from "vitest"
 import {
-  blockIndexOfIssue,
+  blockIndexOfStop,
   blocksFor,
   boardOf,
   countsFor,
   OFF_BOARD,
   priorityGlyph,
   relativeAge,
+  subtreeOf,
   tabOf,
   tabsFromBoard,
   tabsFromCategories,
   tabsFromConfig,
   toBoardRow,
+  treePrefix,
   visibleTabs,
+  type Block,
   type BoardRow,
 } from "./board.js"
 
@@ -175,13 +178,15 @@ describe("boardOf", () => {
 })
 
 describe("grouping by parent", () => {
-  const shape = (blocks: ReturnType<typeof blocksFor>): string[] =>
+  const shape = (blocks: Block<string>[]): string[] =>
     blocks.map((b) =>
       b.kind === "gap"
         ? "·"
         : b.kind === "fence"
           ? `F:${b.summary}`
-          : `${b.depth ? "└" : ""}${b.row.key}`,
+          : b.kind === "leaf"
+            ? `${"└".repeat(b.depth)}${b.data}`
+            : `${"└".repeat(b.depth)}${b.row.key}`,
     )
 
   it("heads a group with the container row itself when it is in the tab", () => {
@@ -224,13 +229,125 @@ describe("grouping by parent", () => {
     ).toEqual(["A-1", "A-2"])
   })
 
-  it("maps the n-th issue back to its line for the cursor, skipping gaps and fences", () => {
+  it("maps the n-th stop back to its line for the cursor, skipping gaps and fences", () => {
     const blocks = blocksFor([
       row({ key: "A-1", parent: epic }),
       row({ key: "A-2" }),
     ])
-    expect(blockIndexOfIssue(blocks, 0)).toBe(1)
-    expect(blockIndexOfIssue(blocks, 1)).toBe(4)
+    expect(blockIndexOfStop(blocks, 0)).toBe(1)
+    expect(blockIndexOfStop(blocks, 1)).toBe(4)
+  })
+})
+
+describe("leaves", () => {
+  const prs: Record<string, string[]> = {
+    "SHOP-300": ["#1"],
+    "A-1": ["#2", "#3"],
+    "A-3": ["#4"],
+  }
+  const under = (r: BoardRow): string[] => prs[r.key] ?? []
+  const shape = (blocks: Block<string>[]): string[] =>
+    blocks.map((b) =>
+      b.kind === "gap"
+        ? "·"
+        : b.kind === "fence"
+          ? `F:${b.summary}`
+          : b.kind === "leaf"
+            ? `${"└".repeat(b.depth)}${b.data}`
+            : `${"└".repeat(b.depth)}${b.row.key}`,
+    )
+
+  it("hangs a row's leaves directly under it, before its children, one level down", () => {
+    const blocks = blocksFor(
+      [
+        row({ key: "SHOP-300", container: true }),
+        row({ key: "A-1", parent: epic }),
+        row({ key: "A-2", parent: epic }),
+      ],
+      under,
+    )
+    expect(shape(blocks)).toEqual([
+      "SHOP-300",
+      "└#1",
+      "└A-1",
+      "└└#2",
+      "└└#3",
+      "└A-2",
+    ])
+  })
+
+  it("hangs leaves under a fenced row and under a plain-list row alike", () => {
+    expect(shape(blocksFor([row({ key: "A-3", parent: epic })], under))).toEqual(
+      ["F:Checkout", "└A-3", "└└#4"],
+    )
+    expect(shape(blocksFor([row({ key: "A-3" })], under))).toEqual([
+      "A-3",
+      "└#4",
+    ])
+  })
+
+  it("counts leaves as cursor stops, never fences", () => {
+    const blocks = blocksFor([row({ key: "A-3", parent: epic })], under)
+    expect(blockIndexOfStop(blocks, 0)).toBe(1)
+    expect(blockIndexOfStop(blocks, 1)).toBe(2)
+  })
+
+  it("subtreeOf takes a row with its leaves and children, and a leaf alone", () => {
+    const blocks = blocksFor(
+      [
+        row({ key: "SHOP-300", container: true }),
+        row({ key: "A-1", parent: epic }),
+        row({ key: "A-2", parent: epic }),
+        row({ key: "B-1" }),
+      ],
+      under,
+    )
+    expect(shape(subtreeOf(blocks, 0))).toEqual([
+      "SHOP-300",
+      "└#1",
+      "└A-1",
+      "└└#2",
+      "└└#3",
+      "└A-2",
+    ])
+    expect(shape(subtreeOf(blocks, 2))).toEqual(["└A-1", "└└#2", "└└#3"])
+    expect(shape(subtreeOf(blocks, 3))).toEqual(["└└#2"])
+    expect(shape(subtreeOf(blocks, 6))).toEqual(["·"])
+    expect(subtreeOf(blocks, 99)).toEqual([])
+  })
+
+  it("draws ├─ while a sibling follows, └─ for the last, and a stem past a non-final parent", () => {
+    const blocks = blocksFor(
+      [
+        row({ key: "SHOP-300", container: true }),
+        row({ key: "A-1", parent: epic }),
+        row({ key: "A-2", parent: epic }),
+      ],
+      under,
+    )
+    expect(blocks.map((_, i) => treePrefix(blocks, i))).toEqual([
+      "",
+      "├─ ",
+      "├─ ",
+      "│  ├─ ",
+      "│  └─ ",
+      "└─ ",
+    ])
+  })
+
+  it("drops the stem under the last child, and a lone child closes at once", () => {
+    const blocks = blocksFor(
+      [row({ key: "SHOP-300", container: true }), row({ key: "A-1", parent: epic })],
+      under,
+    )
+    expect(blocks.map((_, i) => treePrefix(blocks, i))).toEqual([
+      "",
+      "├─ ",
+      "└─ ",
+      "   ├─ ",
+      "   └─ ",
+    ])
+    expect(treePrefix(blocksFor([row({ key: "A-3", parent: epic })]), 1)).toBe("└─ ")
   })
 })
 

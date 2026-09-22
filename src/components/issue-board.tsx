@@ -14,14 +14,17 @@ import { looksLikeJql, type SearchMode } from "@kud/jira"
 import { Box, Text, useInput } from "ink"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import {
-  blockIndexOfIssue,
+  blockIndexOfStop,
   blocksFor,
   countsFor,
   pillVariantFor,
   relativeAge,
+  stopsOf,
+  treePrefix,
   tabOf,
   visibleTabs,
-  type Block,
+  type BoardRow,
+  type Stop,
   type BoardModel,
   type BoardTab,
 } from "../lib/board.js"
@@ -31,8 +34,23 @@ import { priorityMarker } from "./priority-marker.js"
 export type BoardScope =
   { kind: "mine" } | { kind: "search"; query: string; mode: "jql" | "text" }
 
-export type IssueBoardProps = {
+/**
+ * What a host hangs under rows that is not a Jira issue — cockpit hangs a
+ * task's pull requests. The board draws the cursor marker and the tree cell
+ * and hands the rest of the line to `render`; `width` is the columns left
+ * after those, so the renderer can truncate honestly. `L` never reaches
+ * the board's own logic: this package stays Jira-only.
+ */
+export type BoardLeaves<L> = {
+  under: (row: BoardRow) => L[]
+  keyOf: (leaf: L) => string
+  render: (leaf: L, ctx: { active: boolean; width: number }) => ReactNode
+  onOpen: (leaf: L) => void
+}
+
+export type IssueBoardProps<L = never> = {
   model: BoardModel
+  leaves?: BoardLeaves<L>
   /** Who the `mine` scope belongs to, for the title row. */
   viewer: string
   loadedAt: number
@@ -82,12 +100,17 @@ export type IssueBoardProps = {
 // under the title, tabs ×2, the blank above and below the rows, the counter.
 const CHROME = 6
 
+// Columns spent left and right of a row before its own cells: the host's
+// border and padding, the cursor marker, and the padding after the age.
+// The same budget the fence rule draws against.
+const ROW_CHROME = 7
+
 const LEGEND: [string, string][] = [
   ["⇈ ↑", "priority above the default"],
   ["=", "default priority"],
   ["↓ ⇊", "priority below the default"],
   ["── epic ──", "a parent not in this tab; its rows hang beneath"],
-  ["└─", "a row under the container above it"],
+  ["├─ └─", "a row under the container above it; └─ is the last"],
   ["story · bug · task", "issue type"],
   ["2d", "time since last update"],
 ]
@@ -129,8 +152,9 @@ const tabLegendLine = (model: BoardModel): [string, string] =>
  * host — only the keys that open and close the layers it pushes itself: the
  * search input and the legend.
  */
-export const IssueBoard = ({
+export const IssueBoard = <L = never,>({
   model,
+  leaves,
   viewer,
   loadedAt,
   scope,
@@ -145,7 +169,7 @@ export const IssueBoard = ({
   onClearSearch,
   frame,
   onInputFocus,
-}: IssueBoardProps) => {
+}: IssueBoardProps<L>) => {
   const [legend, setLegend] = useState(false)
   const [search, setSearch] = useState<SearchBox>({
     open: false,
@@ -191,18 +215,27 @@ export const IssueBoard = ({
   })
   const tab = active ?? initial ?? ""
 
+  const under = leaves?.under
   const blocks = useMemo(
-    () => blocksFor(narrowed.filter((r) => tabOf(r, model.tabs) === tab)),
-    [narrowed, model.tabs, tab],
+    () =>
+      blocksFor(
+        narrowed.filter((r) => tabOf(r, model.tabs) === tab),
+        under,
+      ),
+    [narrowed, model.tabs, tab, under],
   )
-  const issues = blocks.filter(
-    (b): b is Extract<Block, { kind: "issue" }> => b.kind === "issue",
-  )
-  const { cursor, setCursor } = useListCursor(issues.length, {
+  const stops = stopsOf(blocks)
+  const { cursor, setCursor } = useListCursor(stops.length, {
     vimKeys: true,
     isActive: listFocused,
   })
   useEffect(() => setCursor(0), [tab, setCursor])
+
+  const openStop = (stop: Stop<L> | undefined) => {
+    if (!stop) return
+    if (stop.kind === "issue") onOpen(stop.row.key)
+    else leaves?.onOpen(stop.data)
+  }
 
   useInput((input, key) => {
     if (search.open) {
@@ -218,7 +251,7 @@ export const IssueBoard = ({
       if (input === "?" || key.escape) setLegend(false)
       return
     }
-    if (key.return && issues[cursor]) onOpen(issues[cursor].row.key)
+    if (key.return) openStop(stops[cursor])
     if (input === "/")
       setSearch((s) => ({
         ...s,
@@ -234,7 +267,7 @@ export const IssueBoard = ({
   const searching = search.open || scope.kind === "search"
   const chrome = CHROME + (searching ? 1 : 0) + (searchError ? 1 : 0)
   const size = Math.max(3, height - chrome)
-  const focus = blockIndexOfIssue(blocks, cursor)
+  const focus = blockIndexOfStop(blocks, cursor)
   const { start, end } = windowFor(focus, blocks.length, size)
   const keyWidth = Math.max(8, ...narrowed.map((r) => r.key.length))
   const typeWidth = Math.max(
@@ -255,7 +288,10 @@ export const IssueBoard = ({
   const updated = `updated ${relativeAge(new Date(loadedAt).toISOString(), now)} ago`
   const facts = `${countLabel} · ${scopeLabel} · ${updated}`
   const title = {
-    count: search.open && narrowed.length !== model.rows.length ? narrowed.length : model.rows.length,
+    count:
+      search.open && narrowed.length !== model.rows.length
+        ? narrowed.length
+        : model.rows.length,
     ...(scope.kind === "mine" ? { user: viewer } : {}),
     ...(scope.kind === "search"
       ? { scope: scope.mode === "jql" ? "jql" : `“${scope.query}”` }
@@ -363,14 +399,17 @@ export const IssueBoard = ({
               <Text dimColor>{meaning}</Text>
             </Box>
           ))
-        ) : issues.length === 0 ? (
+        ) : stops.length === 0 ? (
           <Box paddingLeft={4}>
             <Text dimColor>{emptyHint()}</Text>
           </Box>
         ) : (
-          blocks.slice(start, end).map((block, i) =>
-            block.kind === "gap" ? (
-              <Text key={`gap:${start + i}`}> </Text>
+          blocks.slice(start, end).map((block, i) => {
+            const at = start + i
+            const focused = at === focus
+            const prefix = treePrefix(blocks, at)
+            return block.kind === "gap" ? (
+              <Text key={`gap:${at}`}> </Text>
             ) : block.kind === "fence" ? (
               <Box key={`f:${block.key ?? "none"}`} paddingLeft={4}>
                 <Text dimColor>
@@ -378,15 +417,28 @@ export const IssueBoard = ({
                     block.key
                       ? `${block.summary} · ${block.key}`
                       : block.summary,
-                    width - 7,
+                    width - ROW_CHROME,
                   )}
                 </Text>
               </Box>
+            ) : block.kind === "leaf" ? (
+              <SelectableRow
+                key={`leaf:${block.parent.key}:${leaves?.keyOf(block.data)}`}
+                active={focused}
+              >
+                <Box flexShrink={0} width={prefix.length}>
+                  <Text dimColor>{prefix}</Text>
+                </Box>
+                {leaves?.render(block.data, {
+                  active: focused,
+                  width: width - ROW_CHROME - prefix.length,
+                })}
+              </SelectableRow>
             ) : (
-              <SelectableRow key={block.row.key} active={start + i === focus}>
-                {block.depth === 1 ? (
-                  <Box flexShrink={0} width={3}>
-                    <Text dimColor>└─ </Text>
+              <SelectableRow key={block.row.key} active={focused}>
+                {prefix ? (
+                  <Box flexShrink={0} width={prefix.length}>
+                    <Text dimColor>{prefix}</Text>
                   </Box>
                 ) : null}
                 <Box flexShrink={0} width={2}>
@@ -395,7 +447,7 @@ export const IssueBoard = ({
                   </Text>
                 </Box>
                 <Box flexShrink={0} width={keyWidth + 2}>
-                  <Text color={colors.accent} bold={start + i === focus}>
+                  <Text color={colors.accent} bold={focused}>
                     {block.row.key}
                   </Text>
                 </Box>
@@ -405,7 +457,7 @@ export const IssueBoard = ({
                   </Pill>
                 </Box>
                 <Box flexGrow={1}>
-                  <Text wrap="truncate-end" bold={start + i === focus}>
+                  <Text wrap="truncate-end" bold={focused}>
                     {block.row.summary}
                   </Text>
                 </Box>
@@ -413,14 +465,14 @@ export const IssueBoard = ({
                   <Text dimColor>{relativeAge(block.row.updated, now)}</Text>
                 </Box>
               </SelectableRow>
-            ),
-          )
+            )
+          })
         )}
       </Box>
 
       <Box marginTop={1} paddingLeft={2}>
         <Text dimColor>
-          {issues.length ? `${cursor + 1}/${issues.length}` : " "}
+          {stops.length ? `${cursor + 1}/${stops.length}` : " "}
         </Text>
       </Box>
     </>

@@ -6,6 +6,7 @@ import { IssueBoard, type IssueBoardProps } from "./issue-board.js"
 
 const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
 const LEFT = "[D"
+const DOWN = "[B"
 
 const mount = (over: Partial<IssueBoardProps> = {}) =>
   renderFrames(
@@ -61,6 +62,35 @@ describe("IssueBoard", () => {
     expect(lines[head]).toContain("epic")
     expect(lines[head]).not.toContain("──")
     expect(child).toBe(head + 1)
+    r.unmount()
+  })
+
+  it("hangs a host's leaves under their row with a stem, and opens one on enter", async () => {
+    const onOpen = vi.fn()
+    const onOpenLeaf = vi.fn()
+    const r = mount({
+      onOpen,
+      leaves: {
+        under: (row) => (row.key === "SHOP-412" ? ["#128", "#131"] : []),
+        keyOf: (l) => l,
+        render: (l, { active, width }) => (
+          <Text>{`PR ${l} ${active ? "on" : "off"} w${width}`}</Text>
+        ),
+        onOpen: onOpenLeaf,
+      },
+    })
+    await r.waitFor("#131")
+    const lines = r.lastFrame().split("\n")
+    const task = lines.findIndex((l) => l.includes("SHOP-412"))
+    expect(lines[task]).toContain("├─ ")
+    expect(lines[task + 1]).toContain("│  ├─ PR #128 off w87")
+    expect(lines[task + 2]).toContain("│  └─ PR #131 off w87")
+    r.write(DOWN)
+    await r.waitFor("PR #128 on")
+    r.write("\r")
+    await settle()
+    expect(onOpenLeaf).toHaveBeenCalledWith("#128")
+    expect(onOpen).not.toHaveBeenCalled()
     r.unmount()
   })
 

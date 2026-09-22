@@ -24,15 +24,19 @@ export {
   type PriorityMarker,
 } from "./components/priority-marker.js"
 export {
-  blockIndexOfIssue,
+  blockIndexOfStop,
   blocksFor,
   boardOf,
   countsFor,
+  isStop,
   OFF_BOARD,
   pillVariantFor,
   priorityGlyph,
   type PriorityGlyph,
   relativeAge,
+  stopsOf,
+  treePrefix,
+  subtreeOf,
   tabOf,
   tabsFromBoard,
   tabsFromCategories,
@@ -46,6 +50,7 @@ export {
   type BoardTab,
   type BoardTabs,
   type StatusCategory,
+  type Stop,
   type TabSource,
 } from "./lib/board.js"
 export { MOCK_BOARD_ROWS, mockBoard } from "./lib/board-mock.js"
