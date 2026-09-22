@@ -8,9 +8,9 @@ const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
 const LEFT = "[D"
 const DOWN = "[B"
 
-const mount = (over: Partial<IssueBoardProps> = {}) =>
+const mount = (over: Partial<IssueBoardProps<string>> = {}) =>
   renderFrames(
-    <IssueBoard
+    <IssueBoard<string>
       model={mockBoard()}
       viewer="Ada Okafor"
       loadedAt={Date.now()}
@@ -33,20 +33,76 @@ describe("IssueBoard", () => {
     const r = mount()
     await r.waitFor("SHOP-412")
     const f = r.lastFrame()
+    // The epic is counted in each of the three tabs it heads a group in —
+    // placement is bottom-up, so it is a row in all three and nowhere else.
     expect(f).toContain("To do (2)")
-    expect(f).toContain("In progress (4)")
-    expect(f).toContain("Done (1)")
+    expect(f).toContain("In progress (5)")
+    expect(f).toContain("Done (2)")
     expect(f).not.toContain("Blocked")
     r.unmount()
   })
 
-  it("hangs rows under a fence for a parent not in the tab, gaps between groups", async () => {
+  it("hangs rows under a fence for a parent the board holds no row for", async () => {
     const r = mount()
     await r.waitFor("SHOP-412")
     const f = r.lastFrame()
-    expect(f).toContain("── Basket and checkout correctness · SHOP-300")
+    // SHOP-350 is nobody's row here, so it fences; SHOP-300 is a row and is
+    // hauled in as a head instead, however far its own status is from this tab.
+    expect(f).toContain("── Storefront refresh · SHOP-350")
+    expect(f).not.toContain("── Basket and checkout correctness")
     expect(f).toContain("└─")
     expect(f).toContain("── No epic")
+    r.unmount()
+  })
+
+  it("heads every tab its children are split across, noting its own status and the rest", async () => {
+    const r = mount()
+    await r.waitFor("SHOP-412")
+    const head = r
+      .lastFrame()
+      .split("\n")
+      .find((l) => l.includes("SHOP-300"))
+    expect(head).toContain("own To do")
+    expect(head).toMatch(/1 To do · 1 Done/)
+    r.unmount()
+  })
+
+  it("draws a move in flight in place of the notes, and nothing else moves", async () => {
+    const m = mockBoard()
+    const r = mount({
+      model: {
+        ...m,
+        rows: m.rows.map((row) =>
+          row.key === "SHOP-412" ? { ...row, pending: "QA" } : row,
+        ),
+      },
+    })
+    await r.waitFor("⋯ → QA")
+    const line = r
+      .lastFrame()
+      .split("\n")
+      .find((l) => l.includes("SHOP-412"))!
+    expect(line).toContain("⋯ → QA")
+    expect(r.lastFrame()).toContain("In progress (5)")
+    r.unmount()
+  })
+
+  it("says where a fenced parent is: the tab when it is yours, the owner when it is not", async () => {
+    const m = mockBoard()
+    const parent = {
+      ...m.rows[0]!,
+      key: "SHOP-350",
+      summary: "Storefront refresh",
+      assignee: "Priya Raman",
+    }
+    const r = mount({ model: m, parents: [parent] })
+    await r.waitFor("SHOP-350")
+    const fence = r
+      .lastFrame()
+      .split("\n")
+      .find((l) => l.includes("SHOP-350"))!
+    expect(fence).toContain("")
+    expect(fence).not.toContain("To do")
     r.unmount()
   })
 
@@ -85,7 +141,10 @@ describe("IssueBoard", () => {
     expect(lines[task]).toContain("├─ ")
     expect(lines[task + 1]).toContain("│  ├─ PR #128 off w87")
     expect(lines[task + 2]).toContain("│  └─ PR #131 off w87")
-    r.write(DOWN)
+    for (const _ of [0, 1]) {
+      r.write(DOWN)
+      await settle()
+    }
     await r.waitFor("PR #128 on")
     r.write("\r")
     await settle()

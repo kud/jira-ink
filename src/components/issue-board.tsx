@@ -17,6 +17,10 @@ import {
   blockIndexOfStop,
   blocksFor,
   countsFor,
+  fenceNote,
+  headNote,
+  placementOf,
+  rowsInTab,
   pillVariantFor,
   relativeAge,
   stopsOf,
@@ -51,6 +55,12 @@ export type BoardLeaves<L> = {
 export type IssueBoardProps<L = never> = {
   model: BoardModel
   leaves?: BoardLeaves<L>
+  /**
+   * Parents the board holds no row for, so a fence can say where its parent
+   * is. Absent until the lookup lands, which leaves the fence bare rather
+   * than guessing.
+   */
+  parents?: BoardRow[]
   /** Who the `mine` scope belongs to, for the title row. */
   viewer: string
   loadedAt: number
@@ -144,6 +154,42 @@ const tabLegendLine = (model: BoardModel): [string, string] =>
       : ["tabs", "your config file's tabs"]
 
 /**
+ * What a row says about itself after its summary, in one cell so the age
+ * column never moves.
+ *
+ * A move in flight wins the space outright: while it is out, where the row is
+ * about to be is the only news on the line, and a note about where its
+ * children are would read as if it had already landed.
+ *
+ * `behind` is a WORD, bright, and the only bright thing on an otherwise dim
+ * line — a glyph would need a legend, and this has to be legible to a reader
+ * who cannot tell the colour from the dim text beside it.
+ */
+const RowNote = ({ row, note }: { row: BoardRow; note?: string }) => {
+  if (row.pending)
+    return (
+      <Box flexShrink={0} paddingLeft={1}>
+        <Text color={colors.accent}>{`⋯ → ${row.pending}`}</Text>
+      </Box>
+    )
+
+  const behind = row.behind !== undefined
+  const dim = [row.behind || "", note ?? ""].filter(Boolean).join(" · ")
+  if (!behind && !dim) return null
+
+  return (
+    <Box flexShrink={0} paddingLeft={1}>
+      {behind ? (
+        <Text color={colors.warning} bold>
+          behind
+        </Text>
+      ) : null}
+      {dim ? <Text dimColor>{(behind ? " · " : "") + dim}</Text> : null}
+    </Box>
+  )
+}
+
+/**
  * Rows are windowed by hand rather than handed to `Table`, which renders every
  * row and has no notion of a cursor. A backlog of two hundred issues would
  * otherwise scroll the selected row off the top of the terminal.
@@ -155,6 +201,7 @@ const tabLegendLine = (model: BoardModel): [string, string] =>
 export const IssueBoard = <L = never,>({
   model,
   leaves,
+  parents,
   viewer,
   loadedAt,
   scope,
@@ -199,7 +246,11 @@ export const IssueBoard = <L = never,>({
     )
   }, [model.rows, search])
 
-  const counts = countsFor(narrowed, model.tabs)
+  const placement = useMemo(
+    () => placementOf(narrowed, model.tabs),
+    [narrowed, model.tabs],
+  )
+  const counts = countsFor(narrowed, model.tabs, placement)
   const shown: BoardTab[] = visibleTabs(model.tabs, counts)
   const tabItems = shown.map((t) => ({
     value: t.value,
@@ -219,10 +270,11 @@ export const IssueBoard = <L = never,>({
   const blocks = useMemo(
     () =>
       blocksFor(
-        narrowed.filter((r) => tabOf(r, model.tabs) === tab),
+        rowsInTab(narrowed, model.tabs, tab, placement),
         under,
+        parents,
       ),
-    [narrowed, model.tabs, tab, under],
+    [narrowed, model.tabs, tab, placement, under, parents],
   )
   const stops = stopsOf(blocks)
   const { cursor, setCursor } = useListCursor(stops.length, {
@@ -411,16 +463,42 @@ export const IssueBoard = <L = never,>({
             return block.kind === "gap" ? (
               <Text key={`gap:${at}`}> </Text>
             ) : block.kind === "fence" ? (
-              <Box key={`f:${block.key ?? "none"}`} paddingLeft={4}>
-                <Text dimColor>
-                  {rule(
-                    block.key
-                      ? `${block.summary} · ${block.key}`
-                      : block.summary,
-                    width - ROW_CHROME,
-                  )}
-                </Text>
-              </Box>
+              (() => {
+                const { segment, behind } = fenceNote(
+                  block.parent,
+                  model.tabs,
+                  {
+                    viewer,
+                    mine: scope.kind === "mine",
+                  },
+                )
+                const tail = [behind ? "behind" : "", segment]
+                  .filter(Boolean)
+                  .join(" · ")
+                const label = block.key
+                  ? `${block.summary} · ${block.key}`
+                  : block.summary
+                return (
+                  <Box key={`f:${block.key ?? "none"}`} paddingLeft={4}>
+                    <Text dimColor>
+                      {rule(
+                        label,
+                        width - ROW_CHROME - (tail ? tail.length + 1 : 0),
+                      )}
+                    </Text>
+                    {tail ? (
+                      <Box flexShrink={0} paddingLeft={1}>
+                        {behind ? (
+                          <Text color={colors.warning} bold>
+                            behind
+                          </Text>
+                        ) : null}
+                        <Text dimColor>{(behind ? " · " : "") + segment}</Text>
+                      </Box>
+                    ) : null}
+                  </Box>
+                )
+              })()
             ) : block.kind === "leaf" ? (
               <SelectableRow
                 key={`leaf:${block.parent.key}:${leaves?.keyOf(block.data)}`}
@@ -461,6 +539,10 @@ export const IssueBoard = <L = never,>({
                     {block.row.summary}
                   </Text>
                 </Box>
+                <RowNote
+                  row={block.row}
+                  note={headNote(block.row, model.tabs, tab, placement)}
+                />
                 <Box flexShrink={0} width={5} justifyContent="flex-end">
                   <Text dimColor>{relativeAge(block.row.updated, now)}</Text>
                 </Box>

@@ -5,16 +5,26 @@ import {
   blocksFor,
   boardOf,
   countsFor,
+  fenceNote,
+  headNote,
   OFF_BOARD,
+  parentsOf,
+  pendingRow,
+  placementOf,
   priorityGlyph,
   relativeAge,
+  rowsInTab,
+  settleRow,
   subtreeOf,
+  tabLabelOf,
   tabOf,
   tabsFromBoard,
   tabsFromCategories,
   tabsFromConfig,
   toBoardRow,
+  transitionRow,
   treePrefix,
+  withBehind,
   visibleTabs,
   type Block,
   type BoardRow,
@@ -376,5 +386,278 @@ describe("row glyphs", () => {
     expect(relativeAge("2026-08-11T12:00:00.000Z", now)).toBe("3d")
     expect(relativeAge("2026-07-10T12:00:00.000Z", now)).toBe("5w")
     expect(relativeAge("not a date", now)).toBe("")
+  })
+})
+
+describe("bottom-up placement", () => {
+  const tabs = tabsFromConfig([
+    { label: "Backlog", statuses: ["To Do"] },
+    { label: "In progress", statuses: ["In Progress"] },
+    { label: "Review", statuses: ["Code Review"] },
+  ])
+  const at = (key: string, status: string, over: Partial<BoardRow> = {}) =>
+    row({ key, status, statusId: status, ...over })
+  const value = (label: string): string =>
+    tabs.tabs.find((t) => t.label === label)!.value
+  const where = (rows: BoardRow[], key: string): string[] =>
+    placementOf(rows, tabs)
+      .tabsOf(key)
+      .map((v) => tabs.tabs.find((t) => t.value === v)!.label)
+
+  it("places a container by its children, never by its own status", () => {
+    const rows = [
+      at("SHOP-300", "In Progress", { container: true }),
+      at("A-1", "Anything", { parent: epic }),
+      at("A-2", "Anything", { parent: epic }),
+    ]
+    expect(where(rows, "SHOP-300")).toEqual(["Off board"])
+    expect(where(rows, "A-1")).toEqual(["Off board"])
+  })
+
+  it("heads a group in every tab its children are split across, in tab order", () => {
+    const rows = [
+      at("SHOP-300", "To Do", { container: true }),
+      at("A-1", "Code Review", { parent: epic }),
+      at("A-2", "To Do", { parent: epic }),
+    ]
+    expect(where(rows, "SHOP-300")).toEqual(["Backlog", "Review"])
+  })
+
+  it("sits a childless container Off board whatever its own status says", () => {
+    const rows = [at("SHOP-300", "In Progress", { container: true })]
+    expect(where(rows, "SHOP-300")).toEqual(["Off board"])
+  })
+
+  it("counts a head once per tab it appears in, and rowsInTab hauls it along", () => {
+    const rows = [
+      at("SHOP-300", "In Progress", { container: true }),
+      at("A-1", "Code Review", { parent: epic }),
+      at("A-2", "To Do", { parent: epic }),
+    ]
+    const counts = countsFor(rows, tabs)
+    expect(counts[value("Review")]).toBe(2)
+    expect(counts[value("Backlog")]).toBe(2)
+    expect(counts[value("In progress")]).toBe(0)
+    expect(rowsInTab(rows, tabs, value("Review")).map((r) => r.key)).toEqual([
+      "SHOP-300",
+      "A-1",
+    ])
+  })
+
+  it("notes the head's own status when it differs, and where the rest of its children are", () => {
+    const rows = [
+      at("SHOP-300", "In Progress", { container: true }),
+      at("A-1", "Code Review", { parent: epic }),
+      at("A-2", "To Do", { parent: epic }),
+      at("A-3", "To Do", { parent: epic }),
+    ]
+    const p = placementOf(rows, tabs)
+    const head = rows[0]!
+    expect(headNote(head, tabs, value("Review"), p)).toBe(
+      "own In progress · 2 Backlog",
+    )
+    expect(headNote(head, tabs, value("Backlog"), p)).toBe(
+      "own In progress · 1 Review",
+    )
+    expect(headNote(rows[1]!, tabs, value("Review"), p)).toBeUndefined()
+  })
+
+  it("omits the children note when every child is here", () => {
+    const rows = [
+      at("SHOP-300", "To Do", { container: true }),
+      at("A-1", "To Do", { parent: epic }),
+    ]
+    expect(
+      headNote(rows[0]!, tabs, value("Backlog"), placementOf(rows, tabs)),
+    ).toBeUndefined()
+  })
+
+  it("counts only the rows the board holds, never an epic-children query", () => {
+    const rows = [
+      at("SHOP-300", "To Do", { container: true }),
+      at("A-1", "Code Review", { parent: epic }),
+    ]
+    expect(
+      headNote(rows[0]!, tabs, value("Review"), placementOf(rows, tabs)),
+    ).toBe("own Backlog")
+  })
+})
+
+describe("behind", () => {
+  const tabs = tabsFromConfig([
+    { label: "Backlog", statuses: ["Backlog"] },
+    { label: "In progress", statuses: ["In Progress"] },
+    { label: "Review", statuses: ["Code Review"] },
+  ])
+  const at = (key: string, status: string, category: BoardRow["category"], over: Partial<BoardRow> = {}) =>
+    row({ key, status, statusId: status, category, ...over })
+
+  it("marks an epic parked Off board once a child has started", () => {
+    const rows = withBehind(
+      [
+        at("SHOP-300", "Someday", "new", { container: true }),
+        at("A-1", "Code Review", "indeterminate", { parent: epic }),
+      ],
+      tabs,
+    )
+    expect(rows[0]!.behind).toBe("")
+    expect(rows[1]!.behind).toBeUndefined()
+  })
+
+  it("leaves an epic Off board alone while every child is still new", () => {
+    const rows = withBehind(
+      [
+        at("SHOP-300", "Someday", "new", { container: true }),
+        at("A-1", "Backlog", "new", { parent: epic }),
+      ],
+      tabs,
+    )
+    expect(rows[0]!.behind).toBeUndefined()
+  })
+
+  it("marks an epic still open when every child is done", () => {
+    const rows = withBehind(
+      [
+        at("SHOP-300", "In Progress", "indeterminate", { container: true }),
+        at("A-1", "Done", "done", { parent: epic }),
+        at("A-2", "Done", "done", { parent: epic }),
+      ],
+      tabs,
+    )
+    expect(rows[0]!.behind).toBe("")
+  })
+
+  it("never overwrites a reason the host filled in", () => {
+    const rows = withBehind(
+      [
+        at("SHOP-300", "Someday", "new", { container: true, behind: "PR #12 open" }),
+        at("A-1", "Code Review", "indeterminate", { parent: epic }),
+      ],
+      tabs,
+    )
+    expect(rows[0]!.behind).toBe("PR #12 open")
+  })
+})
+
+describe("fence notes", () => {
+  const tabs = tabsFromConfig([
+    { label: "Backlog", statuses: ["Backlog"] },
+    { label: "Review", statuses: ["Code Review"] },
+  ])
+  const mine = { viewer: "Ada Okafor", mine: true }
+  const parent = (over: Partial<BoardRow>) =>
+    row({ key: "SHOP-350", container: true, status: "Backlog", statusId: "Backlog", ...over })
+
+  it("names the tab when the parent is the viewer's own", () => {
+    expect(fenceNote(parent({}), tabs, mine)).toEqual({
+      segment: "Backlog",
+      behind: false,
+    })
+  })
+
+  it("names the owner when the parent is someone else's, and never both", () => {
+    expect(fenceNote(parent({ assignee: "Priya Raman" }), tabs, mine)).toEqual({
+      segment: "@Priya",
+      behind: false,
+    })
+    expect(fenceNote(parent({ assignee: "unassigned" }), tabs, mine)).toEqual({
+      segment: "unassigned",
+      behind: false,
+    })
+  })
+
+  it("carries behind only when the parent is the viewer's", () => {
+    expect(fenceNote(parent({ behind: "" }), tabs, mine).behind).toBe(true)
+    expect(
+      fenceNote(parent({ behind: "", assignee: "Priya Raman" }), tabs, mine)
+        .behind,
+    ).toBe(false)
+  })
+
+  it("names the owner on a board that is not scoped to one assignee", () => {
+    expect(
+      fenceNote(parent({}), tabs, { viewer: "Ada Okafor", mine: false }).segment,
+    ).toBe("@Ada")
+  })
+
+  it("stays empty until the lookup lands", () => {
+    expect(fenceNote(undefined, tabs, mine)).toEqual({
+      segment: "",
+      behind: false,
+    })
+  })
+})
+
+describe("transitions", () => {
+  const tabs = tabsFromConfig([
+    { label: "Backlog", statuses: ["Backlog"] },
+    { label: "QA", statuses: ["10500"] },
+  ])
+  const model = {
+    tabs,
+    rows: [row({ key: "A-1", status: "Backlog", statusId: "Backlog" })],
+  }
+  const to = { id: "10500", name: "Ready for QA", category: "indeterminate" as const }
+
+  it("names the tab a transition lands in, by id and not by name", () => {
+    expect(tabLabelOf(to, tabs)).toBe("QA")
+  })
+
+  it("marks the row without moving it", () => {
+    const next = pendingRow(model, "A-1", to)
+    expect(next.rows[0]!.pending).toBe("QA")
+    expect(tabOf(next.rows[0]!, tabs)).toBe(tabOf(model.rows[0]!, tabs))
+  })
+
+  it("rewrites the status on the 204 so the tab follows, and clears the marker", () => {
+    const next = transitionRow(pendingRow(model, "A-1", to), "A-1", to)
+    expect(next.rows[0]!.pending).toBeUndefined()
+    expect(next.rows[0]!.status).toBe("Ready for QA")
+    expect(next.rows[0]!.statusId).toBe("10500")
+    expect(next.rows[0]!.category).toBe("indeterminate")
+    expect(tabOf(next.rows[0]!, tabs)).toBe(
+      tabs.tabs.find((t) => t.label === "QA")!.value,
+    )
+  })
+
+  it("leaves a rejected move exactly where it was", () => {
+    const next = settleRow(pendingRow(model, "A-1", to), "A-1")
+    expect(next.rows[0]!.pending).toBeUndefined()
+    expect(next.rows[0]!.status).toBe("Backlog")
+  })
+
+  it("touches no other row", () => {
+    const two = { ...model, rows: [...model.rows, row({ key: "A-2" })] }
+    expect(pendingRow(two, "A-1", to).rows[1]).toBe(two.rows[1])
+  })
+})
+
+describe("parentsOf", () => {
+  const issue = (key: string): JiraIssue =>
+    ({ key, fields: { summary: key, assignee: { displayName: "Priya Raman" } } }) as JiraIssue
+
+  it("asks once for every parent the board holds no row for, and never twice for one", async () => {
+    const searchIssues = vi.fn(async () => [issue("SHOP-350")])
+    const rows = [
+      row({ key: "A-1", parent: { key: "SHOP-350", summary: "Storefront" } }),
+      row({ key: "A-2", parent: { key: "SHOP-350", summary: "Storefront" } }),
+      row({ key: "SHOP-300", container: true }),
+      row({ key: "A-3", parent: epic }),
+    ]
+    const got = await parentsOf({ searchIssues } as unknown as JiraClient, rows)
+    expect(searchIssues).toHaveBeenCalledTimes(1)
+    expect(searchIssues.mock.calls[0]![0]).toBe('key in ("SHOP-350")')
+    expect(got.map((p) => p.assignee)).toEqual(["Priya Raman"])
+  })
+
+  it("makes no call when every parent is already a row", async () => {
+    const searchIssues = vi.fn()
+    expect(
+      await parentsOf({ searchIssues } as unknown as JiraClient, [
+        row({ key: "SHOP-300", container: true }),
+        row({ key: "A-1", parent: epic }),
+      ]),
+    ).toEqual([])
+    expect(searchIssues).not.toHaveBeenCalled()
   })
 })

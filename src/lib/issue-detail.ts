@@ -4,6 +4,7 @@ import {
   type JiraClient,
   type LocatedAttachment,
 } from "@kud/jira";
+import { categoryOf, type StatusCategory } from "./board.js";
 
 /**
  * One issue, as the detail screen reads it: every field already a string, ADF
@@ -29,7 +30,17 @@ export type IssueDetail = {
   attachments: LocatedAttachment[];
 };
 
-export type Transition = { id: string; name: string; to: string };
+/**
+ * A transition and where it lands. `to` carries the whole status — id, name
+ * and category — because a host that must decide which TAB the move ends in
+ * cannot do it from a name: names are per-instance, and matching on one is
+ * how a transition table once silently stopped matching anything.
+ */
+export type Transition = {
+  id: string;
+  name: string;
+  to: { id?: string; name: string; category?: StatusCategory };
+};
 
 export const issueDetailOf = async (
   client: JiraClient,
@@ -73,5 +84,11 @@ export const transitionsOf = async (
   (await client.getTransitions(key)).transitions.map((t) => ({
     id: t.id,
     name: t.name,
-    to: t.to?.name ?? t.name,
+    to: {
+      ...(t.to?.id ? { id: t.to.id } : {}),
+      name: t.to?.name ?? t.name,
+      ...(t.to?.statusCategory?.key
+        ? { category: categoryOf(t.to.statusCategory.key) }
+        : {}),
+    },
   }));
