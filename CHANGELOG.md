@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.10.0 — 2026-09-22
+
+### Highlights
+
+- **A host can now learn what's under the cursor.** The board owns the cursor, so a host that wanted to act on the selected row — a move menu bound to its own key, `C`/`O` over every URL hanging off it — had no way to find out which row that was; `onOpen` only ever answers on ↵. `IssueBoardProps.onCursor` fires on every move with `{ stop, subtree }` (the new exported `CursorAt<L>` type) — the stop under the cursor and its subtree, already walked with `subtreeOf` so the host needs no handle on the block list to do it itself. `null` while a tab holds nothing. Purely additive — no existing host needs to change. ([e26ad90](https://github.com/kud/jira-ink/commit/e26ad90ec909e661e59ab4ee23d4aebd75611483))
+
+---
+
 ## 0.9.0 — 2026-09-22
 
 ### Highlights
