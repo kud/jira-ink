@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.10.1 — 2026-10-01
+
+### Security
+
+- Upgrading `@kud/ink-markdown` to 0.3.2 removes an unused `markdown-it` dependency carrying a Dependabot advisory (quadratic-time linkify). It was never imported, so unreachable, but it no longer lands in consumers' trees. ([f5e5ed2](https://github.com/kud/jira-ink/commit/f5e5ed29a5d69906be586aa5689b5300ab94c4ed))
+
+---
+
 ## 0.10.0 — 2026-09-22
 
 ### Highlights
