@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.13.0 — 2026-10-02
+
+### Highlights
+
+- **The board can now show transient messages.** `IssueBoard` takes `flash?: Flash | null`, with a new exported `Flash` type `{ text; tone: "error" | "info" }`. Errors render with a `✗` prefix in the error colour; info is muted with no `✗`. ([a02b232](https://github.com/kud/jira-ink/commit/a02b232ac5ba973fca076baf31082175db942062))
+- **The open legend now hints `esc close` instead of `? close`,** so it no longer duplicates the host's own `?` tail. ([a02b232](https://github.com/kud/jira-ink/commit/a02b232ac5ba973fca076baf31082175db942062))
+
+**Deprecation:** `searchError` is now optional and deprecated in favour of `flash`; it still works, so hosts can migrate at their own pace.
+
+---
+
 ## 0.12.0 — 2026-10-02
 
 ### Highlights
