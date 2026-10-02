@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.12.0 — 2026-10-02
+
+### Highlights
+
+- **A host can now switch the board's keys off.** `IssueBoard` takes `isActive?: boolean` (default `true`); when `false` it still renders but binds no keys, including typing into an open search box. Cursor, tab, search and scroll state are kept, so a host can leave it mounted under an overlay and resume where the user was. Purely additive. ([d8e2cae](https://github.com/kud/jira-ink/commit/d8e2cae3936b22b482c966a85df4498d66960d6f))
+
+---
+
 ## 0.11.0 — 2026-10-02
 
 ### Highlights
