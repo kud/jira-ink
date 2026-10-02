@@ -102,18 +102,38 @@ const model = await boardOf(client, "assignee = currentUser() ORDER BY updated D
 />
 ```
 
-**Tabs come from one of three places, in order of precedence.** Hand-written `tabs` in the config file (statuses by id or name); the board's own column configuration (`getBoardConfiguration`, statuses matched **by id**, never by name); or Jira's status categories — To do, In progress, Done — which every status on every instance carries, so the last needs no configuration and can never name one workflow's vocabulary. Statuses no configured tab claims go to a derived **Off board** tab, drawn only when it holds something; a board with no columns falls through to categories. The board supplies the *vocabulary*, never the population: the fetch stays one query, bucketed client-side.
+**Before the first load lands, draw `IssueBoardSkeleton` through the same `frame`.** It takes only `tabs`, `width`, `height` and `frame`: the real tab labels with `(–)` counts, six placeholder rows on the board's own cell grid, a `title.count` of `null` and a `busy` "reading the board" status (the host adds its spinner). It binds no keys and passes no hints of its own, so the footer is only the host's `q quit` tail. Use it for the first load only; a refetch keeps the stale board on screen and says busy in the title.
 
-| Export | What it is |
-| --- | --- |
-| `IssueBoard` | The tabbed board over a `BoardModel`; a `frame` slot hands the host its title facts, hints and body |
-| `boardOf` | Runs one JQL through a `@kud/jira` client and derives the tabs |
-| `toBoardRow` | One `JiraIssue` → `BoardRow`, the container question answered via `isContainerType` |
-| `tabsFromConfig` · `tabsFromBoard` · `tabsFromCategories` | The three tab sources, each a `BoardTabs` with its `source` named |
-| `tabOf` · `countsFor` · `visibleTabs` | Which tab a row belongs to, per-tab counts, which tabs to draw |
-| `blocksFor` | One tab's rows as drawn: container rows head their group, absent parents get a fence, orphans last, a gap between groups |
-| `priorityGlyph` · `relativeAge` · `pillVariantFor` | Row glyphs |
-| `mockBoard` · `MOCK_BOARD_ROWS` | An invented board for screenshots and tests |
+```tsx
+{
+  model ? (
+    <IssueBoard model={model} frame={frame} {...rest} />
+  ) : (
+    <IssueBoardSkeleton
+      tabs={tabsFromCategories()}
+      width={100}
+      height={30}
+      frame={frame}
+    />
+  )
+}
+```
+
+**Tabs come from one of three places, in order of precedence.** Hand-written `tabs` in the config file (statuses by id or name); the board's own column configuration (`getBoardConfiguration`, statuses matched **by id**, never by name); or Jira's status categories — To do, In progress, Done — which every status on every instance carries, so the last needs no configuration and can never name one workflow's vocabulary. Statuses no configured tab claims go to a derived **Off board** tab, drawn only when it holds something; a board with no columns falls through to categories. The board supplies the _vocabulary_, never the population: the fetch stays one query, bucketed client-side.
+
+| Export                                                    | What it is                                                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `IssueBoard`                                              | The tabbed board over a `BoardModel`; a `frame` slot hands the host its title facts, hints and body                      |
+| `IssueBoardSkeleton`                                      | The board before its first load: real tabs, `(–)` counts, placeholder rows, same `frame` as `IssueBoard`                 |
+| `BoardFrame` · `BoardFrameParts`                          | The `frame` render prop both take; `title.count` is `number \| null`, `title.status.tone` is `"quiet" \| "busy"`         |
+| `boardOf`                                                 | Runs one JQL through a `@kud/jira` client and derives the tabs                                                           |
+| `toBoardRow`                                              | One `JiraIssue` → `BoardRow`, the container question answered via `isContainerType`                                      |
+| `tabsFromConfig` · `tabsFromBoard` · `tabsFromCategories` | The three tab sources, each a `BoardTabs` with its `source` named                                                        |
+| `tabOf` · `countsFor` · `visibleTabs`                     | Which tab a row belongs to, per-tab counts, which tabs to draw                                                           |
+| `blocksFor`                                               | One tab's rows as drawn: container rows head their group, absent parents get a fence, orphans last, a gap between groups |
+| `priorityGlyph` · `relativeAge` · `pillVariantFor`        | Row glyphs                                                                                                               |
+| `mockBoard` · `MOCK_BOARD_ROWS`                           | An invented board for screenshots and tests                                                                              |
+
 ## Development
 
 ```sh
