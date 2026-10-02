@@ -64,6 +64,16 @@ export type CursorAt<L> = {
 }
 
 /**
+ * A transient message drawn under the search box, where `searchError` was.
+ * `tone="error"` renders with a `✗` prefix in `colors.error`; `tone="info"`
+ * renders the text plainly in `colors.muted` (dim) without a prefix.
+ */
+export type Flash = {
+  text: string
+  tone: "error" | "info"
+}
+
+/**
  * What the board hands its host's chrome. `IssueBoardSkeleton` hands over the
  * same parts, so one `frame` draws both and the border never moves between
  * the first load and the board.
@@ -108,8 +118,20 @@ export type IssueBoardProps<L = never> = {
   scope: BoardScope
   /** Whether closed work beyond the recent window has been loaded. */
   showingAll: boolean
-  /** Jira's own words for a query it rejected; drawn under the search box, query kept. */
-  searchError: string | null
+  /**
+   * Jira's own words for a query it rejected; drawn under the search box, query
+   * kept.
+   * @deprecated Use `flash` with `tone="error"` instead.
+   */
+  searchError?: string | null
+  /**
+   * A transient message drawn under the search box, where `searchError`
+   * was. `tone="error"` renders with a `✗` prefix in `colors.error`;
+   * `tone="info"` renders the text plainly in `colors.muted` without a
+   * prefix. If both `flash` and `searchError` are provided, `flash` takes
+   * precedence.
+   */
+  flash?: Flash | null
   width: number
   height: number
   onOpen: (key: string) => void
@@ -194,6 +216,18 @@ const rule = (label: string, width: number): string => {
   return head + "─".repeat(Math.max(0, width - [...head].length))
 }
 
+const FlashLine = ({ flash }: { flash: Flash }) => {
+  if (flash.tone === "error") {
+    return (
+      <Text color={colors.error}>
+        {"  ✗ "}
+        {flash.text}
+      </Text>
+    )
+  }
+  return <Text color={colors.muted}>{`  ${flash.text}`}</Text>
+}
+
 const tabLegendLine = (model: BoardModel): [string, string] =>
   model.tabs.source === "categories"
     ? [
@@ -258,6 +292,7 @@ export const IssueBoard = <L = never,>({
   scope,
   showingAll,
   searchError,
+  flash,
   width,
   height,
   onOpen,
@@ -385,7 +420,10 @@ export const IssueBoard = <L = never,>({
   )
 
   const searching = search.open || scope.kind === "search"
-  const chrome = CHROME + (searching ? 1 : 0) + (searchError ? 1 : 0)
+  const effectiveFlash =
+    flash ??
+    (searchError ? { text: searchError, tone: "error" as const } : null)
+  const chrome = CHROME + (searching ? 1 : 0) + (effectiveFlash ? 1 : 0)
   const size = Math.max(3, height - chrome)
   const focus = blockIndexOfStop(blocks, cursor)
   const { start, end } = windowFor(focus, blocks.length, size)
@@ -428,7 +466,7 @@ export const IssueBoard = <L = never,>({
         ["esc", "cancel"],
       ]
     : legend
-      ? [["?", "close"]]
+      ? [["esc", "close"]]
       : [
           ["↑↓", "move"],
           ["←→", "tab"],
@@ -499,14 +537,9 @@ export const IssueBoard = <L = never,>({
         </Box>
       ) : null}
 
-      {searchError ? (
-        <Text color={colors.error}>
-          {"  ✗ "}
-          {searchError}
-        </Text>
-      ) : null}
+      {effectiveFlash ? <FlashLine flash={effectiveFlash} /> : null}
 
-      <Box paddingLeft={2} marginTop={searching || searchError ? 0 : 1}>
+      <Box paddingLeft={2} marginTop={searching || effectiveFlash ? 0 : 1}>
         <Tabs active={tab} items={tabItems} />
       </Box>
 

@@ -22,6 +22,7 @@ export {
   type BoardLeaves,
   type BoardScope,
   type CursorAt,
+  type Flash,
   type IssueBoardProps,
   type IssueBoardSkeletonProps,
 } from "./components/issue-board.js"

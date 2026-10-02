@@ -220,6 +220,88 @@ describe("IssueBoard", () => {
     r.unmount()
   })
 
+  it("renders flash with error tone using ✗ prefix", async () => {
+    const r = mount({
+      flash: { text: "Muted #11 — gone", tone: "error" },
+    })
+    await r.waitFor("Muted")
+    const f = r.lastFrame()
+    expect(f).toContain("✗ Muted #11 — gone")
+    r.unmount()
+  })
+
+  it("renders flash with info tone without ✗ prefix", async () => {
+    const r = mount({
+      flash: { text: "✓ Muted #11 — gone", tone: "info" },
+    })
+    await r.waitFor("Muted")
+    const f = r.lastFrame()
+    expect(f).toContain("✓ Muted #11 — gone")
+    expect(f).not.toContain("✗ ✓")
+    r.unmount()
+  })
+
+  it("flash takes precedence over searchError when both are provided", async () => {
+    const r = mount({
+      searchError: "legacy error",
+      flash: { text: "flash info", tone: "info" },
+    })
+    await r.waitFor("flash")
+    const f = r.lastFrame()
+    expect(f).toContain("flash info")
+    expect(f).not.toContain("legacy error")
+    r.unmount()
+  })
+
+  it("legend hints use esc not ?, avoiding duplicate with Page tail", async () => {
+    const captured: BoardFrameParts[] = []
+    const r = mount({
+      frame: ({ facts, title, hints, body }) => {
+        captured.push({ facts, title, hints, body })
+        return (
+          <Box flexDirection="column">
+            <Text>{facts}</Text>
+            {body}
+            <Text>{`HINTS ${hints.map(([k]) => k).join(",")}`}</Text>
+          </Box>
+        )
+      },
+    })
+    await r.waitFor("SHOP-412")
+
+    const tailKeys = ["?", "q"] as const
+    const assertNoCollision = (keys: string[]) => {
+      expect(new Set(keys).size).toBe(keys.length)
+      for (const k of tailKeys) {
+        expect(keys).not.toContain(k)
+      }
+    }
+
+    // Legend closed - default hints should not contain ?
+    let parts = captured[captured.length - 1]
+    let hintKeys = parts.hints.map(([k]) => k)
+    expect(hintKeys).not.toContain("?")
+    assertNoCollision(hintKeys)
+
+    // Open legend with ?
+    r.write("?")
+    await settle()
+    parts = captured[captured.length - 1]
+    hintKeys = parts.hints.map(([k]) => k)
+    expect(hintKeys).toEqual(["esc"])
+    expect(hintKeys).not.toContain("?")
+    assertNoCollision(hintKeys)
+
+    // Close legend with esc
+    r.write("\u001b")
+    await settle()
+    parts = captured[captured.length - 1]
+    hintKeys = parts.hints.map(([k]) => k)
+    expect(hintKeys).not.toContain("?")
+    assertNoCollision(hintKeys)
+    r.unmount()
+  })
+
   it("reports the cursor and its subtree, so a host can bind keys of its own", async () => {
     const seen: string[][] = []
     const r = mount({

@@ -76,6 +76,8 @@ const issue = await issueDetailOf(client, baseUrl, "SHOP-1234")
 
 A tabbed list of issues: rows grouped under their epic, a type pill, a priority glyph and an age on each, and a `/` search that takes plain words or JQL. The host owns the frame, the fetch and the quit key; the board owns only the layers it pushes itself (its search box and its legend).
 
+`IssueBoard` accepts a `flash?: { text: string; tone: "error" | "info" } | null` prop for transient messages. `tone: "error"` draws with a `✗` prefix in the error colour; `tone: "info"` draws the text plainly in muted/dim. The legacy `searchError` prop is deprecated in favour of `flash`.
+
 `IssueBoard` accepts an `isActive?: boolean` prop (default `true`). When `false`, the board renders normally but binds no keys — tab switching, cursor movement, search, legend, and Enter to open are all disabled. Cursor, tab, search and scroll state are preserved so the board can be reactivated without losing position.
 
 ```tsx
@@ -92,7 +94,7 @@ const model = await boardOf(client, "assignee = currentUser() ORDER BY updated D
   loadedAt={Date.now()}
   scope={{ kind: "mine" }}
   showingAll={false}
-  searchError={null}
+  flash={null}
   width={100}
   height={30}
   onOpen={openIssue}
