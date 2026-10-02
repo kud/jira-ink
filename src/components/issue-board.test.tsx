@@ -2,7 +2,13 @@ import { renderFrames } from "@kud/cli-testing"
 import { Box, Text } from "ink"
 import { describe, expect, it, vi } from "vitest"
 import { mockBoard } from "../lib/board-mock.js"
-import { IssueBoard, type IssueBoardProps } from "./issue-board.js"
+import { tabsFromCategories } from "../lib/board.js"
+import {
+  IssueBoard,
+  IssueBoardSkeleton,
+  type BoardFrameParts,
+  type IssueBoardProps,
+} from "./issue-board.js"
 
 const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
 const LEFT = "[D"
@@ -252,6 +258,85 @@ describe("IssueBoard", () => {
     const r = mount({ model })
     await r.waitFor("Nothing here")
     expect(r.lastFrame()).toContain("To do (2)")
+    r.unmount()
+  })
+})
+
+describe("IssueBoardSkeleton", () => {
+  const BAR = /█/
+
+  it("draws the real tab labels with unknown counts", async () => {
+    const r = renderFrames(
+      <IssueBoardSkeleton tabs={tabsFromCategories()} width={100} height={24} />,
+    )
+    await r.waitFor("To do")
+    const f = r.lastFrame()
+    expect(f).toContain("To do  (–)")
+    expect(f).toContain("In progress  (–)")
+    expect(f).toContain("Done  (–)")
+    r.unmount()
+  })
+
+  it("draws six bar rows in two groups of three, with no tree", async () => {
+    const r = renderFrames(
+      <IssueBoardSkeleton tabs={tabsFromCategories()} width={100} height={24} />,
+    )
+    await r.waitFor("█")
+    const lines = r.lastFrame().split("\n")
+    const first = lines.findIndex((l) => BAR.test(l))
+    const run = lines.slice(first, first + 7)
+    expect(run.map((l) => BAR.test(l))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+    ])
+    expect(run[3]!.trim()).toBe("")
+    expect(lines.filter((l) => BAR.test(l))).toHaveLength(6)
+    expect(r.lastFrame()).not.toMatch(/[├└│]/)
+    r.unmount()
+  })
+
+  it("hands the same frame its parts: unknown count, busy status, no hints of its own", async () => {
+    let parts: BoardFrameParts | undefined
+    const frame = vi.fn((p: BoardFrameParts) => {
+      parts = p
+      return (
+        <Box flexDirection="column">
+          <Text>FRAMED</Text>
+          {p.body}
+        </Box>
+      )
+    })
+    const r = renderFrames(
+      <IssueBoardSkeleton
+        tabs={tabsFromCategories()}
+        width={100}
+        height={24}
+        frame={frame}
+      />,
+    )
+    await r.waitFor("FRAMED")
+    expect(frame).toHaveBeenCalled()
+    expect(parts?.title.count).toBeNull()
+    expect(parts?.title.status).toEqual({
+      text: "reading the board",
+      tone: "busy",
+    })
+    expect(parts?.hints).toEqual([])
+    r.unmount()
+  })
+
+  it("ends its own footer with q quit and nothing else when unframed", async () => {
+    const r = renderFrames(
+      <IssueBoardSkeleton tabs={tabsFromCategories()} width={100} height={24} />,
+    )
+    await r.waitFor("quit")
+    const last = r.lastFrame().trimEnd().split("\n").at(-1)!
+    expect(last.trim()).toBe("q quit")
     r.unmount()
   })
 })

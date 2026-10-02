@@ -16,10 +16,14 @@ export {
 } from "./lib/issue-detail.js"
 export {
   IssueBoard,
+  IssueBoardSkeleton,
+  type BoardFrame,
+  type BoardFrameParts,
   type BoardLeaves,
   type BoardScope,
   type CursorAt,
   type IssueBoardProps,
+  type IssueBoardSkeletonProps,
 } from "./components/issue-board.js"
 export {
   priorityMarker,

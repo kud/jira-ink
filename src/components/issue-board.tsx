@@ -4,6 +4,7 @@ import {
   Pill,
   pillWidth,
   SelectableRow,
+  SkeletonBar,
   Tabs,
   TextInput,
   useListCursor,
@@ -33,6 +34,7 @@ import {
   type Stop,
   type BoardModel,
   type BoardTab,
+  type BoardTabs,
 } from "../lib/board.js"
 import { priorityMarker } from "./priority-marker.js"
 
@@ -60,6 +62,36 @@ export type CursorAt<L> = {
   /** The stop and its descendants, as `subtreeOf` reads them. */
   subtree: Block<L>[]
 }
+
+/**
+ * What the board hands its host's chrome. `IssueBoardSkeleton` hands over the
+ * same parts, so one `frame` draws both and the border never moves between
+ * the first load and the board.
+ */
+export type BoardFrameParts = {
+  /** One string for a host with a plain title row. */
+  facts: string
+  /**
+   * The same facts as segments, for a host drawing ink-ui's `Page` title
+   * row: how many rows the board holds (or `N of M` while narrowing),
+   * who the `mine` scope belongs to, the search as a further scope, and
+   * freshness as a quiet status.
+   *
+   * `count` is `null` while it is not known yet (the skeleton), and the
+   * status is then `busy` rather than a freshness word.
+   */
+  title: {
+    count: number | null
+    user?: string
+    scope?: string
+    status: { text: string; tone: "quiet" | "busy" }
+  }
+  /** The view's own hints only; the host's `Page` derives the `q quit` tail. */
+  hints: Hint[]
+  body: ReactNode
+}
+
+export type BoardFrame = (parts: BoardFrameParts) => ReactNode
 
 export type IssueBoardProps<L = never> = {
   model: BoardModel
@@ -90,24 +122,7 @@ export type IssueBoardProps<L = never> = {
    * places the parts. Without it the board draws a plain column, which is
    * what a test or an embedded pane wants.
    */
-  frame?: (parts: {
-    /** One string for a host with a plain title row. */
-    facts: string
-    /**
-     * The same facts as segments, for a host drawing ink-ui's `Page` title
-     * row: how many rows the board holds (or `N of M` while narrowing),
-     * who the `mine` scope belongs to, the search as a further scope, and
-     * freshness as a quiet status.
-     */
-    title: {
-      count: number
-      user?: string
-      scope?: string
-      status: { text: string; tone: "quiet" }
-    }
-    hints: Hint[]
-    body: ReactNode
-  }) => ReactNode
+  frame?: BoardFrame
   /**
    * Fires when the search box takes or loses focus, so the host can stand its
    * app keys down while a letter is a letter — `q` must type there, not quit.
@@ -135,6 +150,14 @@ const CHROME = 6
 // border and padding, the cursor marker, and the padding after the age.
 // The same budget the fence rule draws against.
 const ROW_CHROME = 7
+
+// The row's own cells, left to right after the cursor marker: the priority
+// marker, the key (at least this wide), the type pill, the summary taking what
+// is left, the age. Each fixed cell carries two columns of air after it.
+const PRIORITY_WIDTH = 2
+const KEY_MIN_WIDTH = 8
+const CELL_AIR = 2
+const AGE_WIDTH = 5
 
 const LEGEND: [string, string][] = [
   ["⇈ ↑", "priority above the default"],
@@ -308,7 +331,12 @@ export const IssueBoard = <L = never,>({
   const at = stops[cursor]
   useEffect(() => {
     onCursor?.(
-      at ? { stop: at, subtree: subtreeOf(blocks, blockIndexOfStop(blocks, cursor)) } : null,
+      at
+        ? {
+            stop: at,
+            subtree: subtreeOf(blocks, blockIndexOfStop(blocks, cursor)),
+          }
+        : null,
     )
   }, [at, blocks, cursor, onCursor])
 
@@ -350,7 +378,7 @@ export const IssueBoard = <L = never,>({
   const size = Math.max(3, height - chrome)
   const focus = blockIndexOfStop(blocks, cursor)
   const { start, end } = windowFor(focus, blocks.length, size)
-  const keyWidth = Math.max(8, ...narrowed.map((r) => r.key.length))
+  const keyWidth = Math.max(KEY_MIN_WIDTH, ...narrowed.map((r) => r.key.length))
   const typeWidth = Math.max(
     0,
     ...narrowed.map((r) => pillWidth(r.type.toLowerCase())),
@@ -548,17 +576,17 @@ export const IssueBoard = <L = never,>({
                     <Text dimColor>{prefix}</Text>
                   </Box>
                 ) : null}
-                <Box flexShrink={0} width={2}>
+                <Box flexShrink={0} width={PRIORITY_WIDTH}>
                   <Text color={priorityMarker(block.row.priority).color}>
                     {priorityMarker(block.row.priority).marker}
                   </Text>
                 </Box>
-                <Box flexShrink={0} width={keyWidth + 2}>
+                <Box flexShrink={0} width={keyWidth + CELL_AIR}>
                   <Text color={colors.accent} bold={focused}>
                     {block.row.key}
                   </Text>
                 </Box>
-                <Box flexShrink={0} width={typeWidth + 2}>
+                <Box flexShrink={0} width={typeWidth + CELL_AIR}>
                   <Pill tone="soft" variant={pillVariantFor(block.row)}>
                     {block.row.type.toLowerCase()}
                   </Pill>
@@ -572,7 +600,7 @@ export const IssueBoard = <L = never,>({
                   row={block.row}
                   note={headNote(block.row, model.tabs, tab, placement)}
                 />
-                <Box flexShrink={0} width={5} justifyContent="flex-end">
+                <Box flexShrink={0} width={AGE_WIDTH} justifyContent="flex-end">
                   <Text dimColor>{relativeAge(block.row.updated, now)}</Text>
                 </Box>
               </SelectableRow>
@@ -595,6 +623,124 @@ export const IssueBoard = <L = never,>({
       <Text dimColor>{facts}</Text>
       {body}
       <FooterHints hints={hints} />
+    </Box>
+  )
+}
+
+// Deterministic, so the placeholder never reshuffles between renders.
+const SKELETON_SUMMARY_FRACTIONS = [0.62, 0.48, 0.71, 0.4, 0.55, 0.66]
+const SKELETON_ROWS = 6
+const SKELETON_GROUP = 3
+const SKELETON_KEY = 8
+const SKELETON_TYPE = 4
+const SKELETON_AGE = 2
+// The type cell the skeleton holds open: as wide as a `story` pill, the
+// widest of the common types, so the summary starts where it will land.
+const SKELETON_TYPE_WIDTH = pillWidth("story")
+
+export type IssueBoardSkeletonProps = {
+  /** The board's tabs, known before its rows: labels are drawn, counts are `(–)`. */
+  tabs: BoardTabs
+  width: number
+  height: number
+  /** The same render prop `IssueBoard` takes, so the chrome is identical. */
+  frame?: BoardFrame
+}
+
+/**
+ * The board before its first load lands: the real tabs with unknown counts,
+ * and six placeholder rows on the real cell grid, so nothing jumps when the
+ * rows arrive. Only for that first load — a refetch keeps the stale board on
+ * screen and says busy in the title instead.
+ *
+ * It binds no keys at all: there is nothing to move to or open, and `q`
+ * belongs to the host's `useAppKeys`.
+ */
+export const IssueBoardSkeleton = ({
+  tabs,
+  width,
+  height,
+  frame,
+}: IssueBoardSkeletonProps) => {
+  const shown = tabs.tabs.filter((t) => !t.offBoard)
+  const tabItems = shown.map((t) => ({
+    value: t.value,
+    label: t.label,
+    count: null,
+  }))
+  const size = Math.max(3, height - CHROME)
+  const summaryWidth = Math.max(
+    0,
+    width -
+      ROW_CHROME -
+      PRIORITY_WIDTH -
+      (KEY_MIN_WIDTH + CELL_AIR) -
+      (SKELETON_TYPE_WIDTH + CELL_AIR) -
+      AGE_WIDTH,
+  )
+
+  const lines: Array<number | null> = []
+  for (let i = 0; i < SKELETON_ROWS; i++) {
+    lines.push(i)
+    if ((i + 1) % SKELETON_GROUP === 0 && i < SKELETON_ROWS - 1)
+      lines.push(null)
+  }
+
+  const facts = "reading the board"
+  const title: BoardFrameParts["title"] = {
+    count: null,
+    status: { text: facts, tone: "busy" },
+  }
+  const hints: Hint[] = []
+
+  const body = (
+    <>
+      <Box paddingLeft={2} marginTop={1}>
+        <Tabs active={shown[0]?.value ?? ""} items={tabItems} />
+      </Box>
+
+      <Box flexDirection="column" marginTop={1} height={size} paddingRight={1}>
+        {lines.map((row, at) =>
+          row === null ? (
+            <Text key={`gap:${at}`}> </Text>
+          ) : (
+            <SelectableRow key={`bar:${row}`}>
+              <Box flexShrink={0} width={PRIORITY_WIDTH} />
+              <Box flexShrink={0} width={KEY_MIN_WIDTH + CELL_AIR}>
+                <SkeletonBar width={SKELETON_KEY} />
+              </Box>
+              <Box flexShrink={0} width={SKELETON_TYPE_WIDTH + CELL_AIR}>
+                <SkeletonBar width={SKELETON_TYPE} />
+              </Box>
+              <Box flexGrow={1}>
+                <SkeletonBar
+                  width={Math.round(
+                    SKELETON_SUMMARY_FRACTIONS[
+                      row % SKELETON_SUMMARY_FRACTIONS.length
+                    ]! * summaryWidth,
+                  )}
+                />
+              </Box>
+              <Box flexShrink={0} width={AGE_WIDTH} justifyContent="flex-end">
+                <SkeletonBar width={SKELETON_AGE} />
+              </Box>
+            </SelectableRow>
+          ),
+        )}
+      </Box>
+
+      <Box marginTop={1} paddingLeft={2}>
+        <Text> </Text>
+      </Box>
+    </>
+  )
+
+  if (frame) return frame({ facts, title, hints, body })
+  return (
+    <Box flexDirection="column">
+      <Text dimColor>{facts}</Text>
+      {body}
+      <FooterHints hints={hints} page="root" help={false} />
     </Box>
   )
 }

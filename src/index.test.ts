@@ -8,5 +8,7 @@ describe("@kud/jira-ink", () => {
     expect(typeof mod.IssueBody).toBe("function")
     expect(typeof mod.issueDetailOf).toBe("function")
     expect(typeof mod.transitionsOf).toBe("function")
+    expect(typeof mod.IssueBoard).toBe("function")
+    expect(typeof mod.IssueBoardSkeleton).toBe("function")
   })
 })
