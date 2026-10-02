@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.11.0 — 2026-10-02
+
+### Highlights
+
+- **The board now has a loading state.** `IssueBoardSkeleton({ tabs, width, height, frame? })` draws the board before its first load: real tab labels with `(–)` counts, six placeholder rows in two groups, no keys bound. It renders through the same `frame` prop as `IssueBoard`. ([6562084](https://github.com/kud/jira-ink/commit/65620849fd27194b3c7c457a318c382ad2e59160))
+- **The frame contract is exported as `BoardFrame` / `BoardFrameParts`,** so a host can type its own frame once and use it for both the board and its skeleton. ([6562084](https://github.com/kud/jira-ink/commit/65620849fd27194b3c7c457a318c382ad2e59160))
+- **`@kud/ink-ui` is now 0.32.0** (exact, from 0.29.0), bringing `Page fill`, skeletons and `TabItem.count: number | null`; nothing in 0.30 or 0.31 breaks here. ([6562084](https://github.com/kud/jira-ink/commit/65620849fd27194b3c7c457a318c382ad2e59160))
+
+### Documentation
+
+- The `IssueBoard` API docs are expanded and now include a skeleton example. ([0055b4e](https://github.com/kud/jira-ink/commit/0055b4ebb450890d1cb2d926bc4310be9cad85df))
+
+**Upgrade note:** the frame contract widened for the skeleton. `title.count` is now `number | null` (`null` means unknown, only ever sent by the skeleton) and `title.status.tone` is `"quiet" | "busy"`. A host passing `title.count` straight to ink-ui `Page`'s `count?: number` must map `null` to `undefined`, e.g. `count={title.count ?? undefined}`, to typecheck.
+
+---
+
 ## 0.10.1 — 2026-10-01
 
 ### Security
