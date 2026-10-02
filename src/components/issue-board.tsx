@@ -140,6 +140,13 @@ export type IssueBoardProps<L = never> = {
    * `null` while a tab holds nothing.
    */
   onCursor?: (at: CursorAt<L> | null) => void
+  /**
+   * Whether the board binds keys. When `false`, the board renders normally
+   * but all key handlers are disabled — tab switching, cursor movement,
+   * search, legend, and Enter to open. State (cursor, tab, search, scroll)
+   * is preserved. Default `true`.
+   */
+  isActive?: boolean
 }
 
 // Lines the board spends around the rows inside the host's frame: the blank
@@ -261,6 +268,7 @@ export const IssueBoard = <L = never,>({
   frame,
   onInputFocus,
   onCursor,
+  isActive = true,
 }: IssueBoardProps<L>) => {
   const [legend, setLegend] = useState(false)
   const [search, setSearch] = useState<SearchBox>({
@@ -307,7 +315,7 @@ export const IssueBoard = <L = never,>({
     shown.find((t) => t.category === "indeterminate")?.value ?? shown[0]?.value
   const { active } = useTabs(tabItems, {
     initial,
-    isActive: listFocused,
+    isActive: isActive && listFocused,
   })
   const tab = active ?? initial ?? ""
 
@@ -324,7 +332,7 @@ export const IssueBoard = <L = never,>({
   const stops = stopsOf(blocks)
   const { cursor, setCursor } = useListCursor(stops.length, {
     vimKeys: true,
-    isActive: listFocused,
+    isActive: isActive && listFocused,
   })
   useEffect(() => setCursor(0), [tab, setCursor])
 
@@ -346,32 +354,35 @@ export const IssueBoard = <L = never,>({
     else leaves?.onOpen(stop.data)
   }
 
-  useInput((input, key) => {
-    if (search.open) {
-      if (key.escape) setSearch((s) => ({ ...s, open: false }))
-      if (key.tab)
+  useInput(
+    (input, key) => {
+      if (search.open) {
+        if (key.escape) setSearch((s) => ({ ...s, open: false }))
+        if (key.tab)
+          setSearch((s) => ({
+            ...s,
+            mode: modeOf(s) === "jql" ? "text" : "jql",
+          }))
+        return
+      }
+      if (legend) {
+        if (input === "?" || key.escape) setLegend(false)
+        return
+      }
+      if (key.return) openStop(stops[cursor])
+      if (input === "/")
         setSearch((s) => ({
           ...s,
-          mode: modeOf(s) === "jql" ? "text" : "jql",
+          open: true,
+          draft: scope.kind === "search" ? scope.query : s.draft,
         }))
-      return
-    }
-    if (legend) {
-      if (input === "?" || key.escape) setLegend(false)
-      return
-    }
-    if (key.return) openStop(stops[cursor])
-    if (input === "/")
-      setSearch((s) => ({
-        ...s,
-        open: true,
-        draft: scope.kind === "search" ? scope.query : s.draft,
-      }))
-    if (input === "?") setLegend(true)
-    if (input === "a") onToggleAll()
-    if (input === "r") onRefresh()
-    if (input === "x" && scope.kind === "search") onClearSearch()
-  })
+      if (input === "?") setLegend(true)
+      if (input === "a") onToggleAll()
+      if (input === "r") onRefresh()
+      if (input === "x" && scope.kind === "search") onClearSearch()
+    },
+    { isActive },
+  )
 
   const searching = search.open || scope.kind === "search"
   const chrome = CHROME + (searching ? 1 : 0) + (searchError ? 1 : 0)
@@ -467,6 +478,7 @@ export const IssueBoard = <L = never,>({
                 if (query.trim()) onSearch(query, search.mode)
                 else onClearSearch()
               }}
+              isDisabled={!isActive}
             />
           </Box>
           <Box flexShrink={0}>

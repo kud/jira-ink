@@ -1,4 +1,5 @@
 import { renderFrames } from "@kud/cli-testing"
+import { render } from "ink-testing-library"
 import { Box, Text } from "ink"
 import { describe, expect, it, vi } from "vitest"
 import { mockBoard } from "../lib/board-mock.js"
@@ -11,8 +12,11 @@ import {
 } from "./issue-board.js"
 
 const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
-const LEFT = "[D"
-const DOWN = "[B"
+const LEFT = "\u001b[D"
+const DOWN = "\u001b[B"
+const RIGHT = "\u001b[C"
+const ENTER = "\r"
+const SLASH = "/"
 
 const mount = (over: Partial<IssueBoardProps<string>> = {}) =>
   renderFrames(
@@ -260,6 +264,207 @@ describe("IssueBoard", () => {
     expect(r.lastFrame()).toContain("To do (2)")
     r.unmount()
   })
+
+  describe("isActive", () => {
+    it("disables all key handlers when false", async () => {
+      const onOpen = vi.fn()
+      const onCursor = vi.fn()
+      const onSearch = vi.fn()
+      const onToggleAll = vi.fn()
+      const onRefresh = vi.fn()
+      const onClearSearch = vi.fn()
+      const r = mount({
+        isActive: false,
+        onOpen,
+        onCursor,
+        onSearch,
+        onToggleAll,
+        onRefresh,
+        onClearSearch,
+      })
+      await r.waitFor("SHOP-412")
+      const frameBefore = r.lastFrame()
+
+      // Press down arrow (cursor movement)
+      r.write(DOWN)
+      await settle()
+      expect(r.lastFrame()).toBe(frameBefore)
+      // onCursor is called once on mount with initial cursor position
+      // After that, no more calls should happen when keys are pressed while inactive
+      expect(onCursor).toHaveBeenCalledTimes(1)
+
+      // Press right arrow (tab switch)
+      r.write(RIGHT)
+      await settle()
+      expect(r.lastFrame()).toBe(frameBefore)
+
+      // Press Enter (open)
+      r.write(ENTER)
+      await settle()
+      expect(r.lastFrame()).toBe(frameBefore)
+      expect(onOpen).not.toHaveBeenCalled()
+
+      // Press / (search)
+      r.write(SLASH)
+      await settle()
+      expect(r.lastFrame()).toBe(frameBefore)
+      expect(onSearch).not.toHaveBeenCalled()
+
+      // Press a (toggle all)
+      r.write("a")
+      await settle()
+      expect(onToggleAll).not.toHaveBeenCalled()
+
+      // Press r (refresh)
+      r.write("r")
+      await settle()
+      expect(onRefresh).not.toHaveBeenCalled()
+
+      r.unmount()
+    })
+
+    it("preserves cursor, tab, and search state when toggled off and on", async () => {
+      const onOpen = vi.fn()
+      const onCursor = vi.fn()
+      const onSearch = vi.fn()
+      const onToggleAll = vi.fn()
+      const onRefresh = vi.fn()
+      const onClearSearch = vi.fn()
+
+      const makeElement = (isActive: boolean) => (
+        <IssueBoard<string>
+          model={mockBoard()}
+          viewer="Ada Okafor"
+          loadedAt={Date.now()}
+          scope={{ kind: "mine" }}
+          showingAll={false}
+          searchError={null}
+          width={100}
+          height={24}
+          isActive={isActive}
+          onOpen={onOpen}
+          onCursor={onCursor}
+          onSearch={onSearch}
+          onToggleAll={onToggleAll}
+          onRefresh={onRefresh}
+          onClearSearch={onClearSearch}
+        />
+      )
+
+      const instance = render(makeElement(true))
+
+      const waitFor = async (needle: string | RegExp) => {
+        const deadline = Date.now() + 3000
+        for (;;) {
+          const current = instance.frames.join("\n")
+          const found =
+            typeof needle === "string"
+              ? current.includes(needle)
+              : needle.test(current)
+          if (found) return current
+          if (Date.now() >= deadline) {
+            throw new Error(`Timed out waiting for ${needle}`)
+          }
+          await settle()
+        }
+      }
+
+      const waitForFrameChange = async (prevFrame: string) => {
+        const deadline = Date.now() + 2000
+        for (;;) {
+          const current = instance.lastFrame() ?? ""
+          if (current !== prevFrame) return current
+          if (Date.now() >= deadline) {
+            throw new Error("Timed out waiting for frame change")
+          }
+          await settle()
+        }
+      }
+
+      await waitFor("SHOP-412")
+      await settle()
+
+      // Move cursor down to second item (first child of epic)
+      const frameBeforeMove = instance.lastFrame() ?? ""
+      instance.stdin.write(DOWN)
+      await settle()
+
+      // Wait for frame to change (cursor moved)
+      const frameWithCursorDown = await waitForFrameChange(frameBeforeMove)
+
+      // Deactivate
+      instance.rerender(makeElement(false))
+      await settle()
+
+      // Press keys while inactive — nothing should change
+      instance.stdin.write(DOWN)
+      await settle()
+      instance.stdin.write(RIGHT)
+      await settle()
+      instance.stdin.write(ENTER)
+      await settle()
+      expect(instance.lastFrame() ?? "").toBe(frameWithCursorDown)
+      expect(onOpen).not.toHaveBeenCalled()
+
+      // Reactivate
+      instance.rerender(makeElement(true))
+      await settle()
+
+      // Cursor should still be on second item (SHOP-412)
+      expect(instance.lastFrame() ?? "").toBe(frameWithCursorDown)
+
+      // Keys should work again — press Enter to open SHOP-412
+      instance.stdin.write(ENTER)
+      await settle()
+      expect(onOpen).toHaveBeenCalledWith("SHOP-412")
+
+      // Another down arrow should move cursor
+      instance.stdin.write(DOWN)
+      await settle()
+      expect(instance.lastFrame() ?? "").not.toBe(frameWithCursorDown)
+
+      instance.unmount()
+    })
+
+    it("ignores typing into an open search box once deactivated", async () => {
+      const onSearch = vi.fn()
+      const element = (isActive: boolean) => (
+        <IssueBoard<string>
+          model={mockBoard()}
+          viewer="Ada Okafor"
+          loadedAt={Date.now()}
+          scope={{ kind: "mine" }}
+          showingAll={false}
+          searchError={null}
+          width={100}
+          height={24}
+          isActive={isActive}
+          onOpen={vi.fn()}
+          onToggleAll={vi.fn()}
+          onRefresh={vi.fn()}
+          onSearch={onSearch}
+          onClearSearch={vi.fn()}
+        />
+      )
+      const instance = render(element(true))
+      await settle()
+      instance.stdin.write(SLASH)
+      await settle()
+      expect(instance.lastFrame()).toContain("words, or JQL")
+
+      instance.rerender(element(false))
+      await settle()
+      const frameWithEmptySearch = instance.lastFrame()
+      instance.stdin.write("bug")
+      await settle()
+      instance.stdin.write(ENTER)
+      await settle()
+
+      expect(instance.lastFrame()).toBe(frameWithEmptySearch)
+      expect(onSearch).not.toHaveBeenCalled()
+      instance.unmount()
+    })
+  })
 })
 
 describe("IssueBoardSkeleton", () => {
@@ -267,7 +472,11 @@ describe("IssueBoardSkeleton", () => {
 
   it("draws the real tab labels with unknown counts", async () => {
     const r = renderFrames(
-      <IssueBoardSkeleton tabs={tabsFromCategories()} width={100} height={24} />,
+      <IssueBoardSkeleton
+        tabs={tabsFromCategories()}
+        width={100}
+        height={24}
+      />,
     )
     await r.waitFor("To do")
     const f = r.lastFrame()
@@ -279,7 +488,11 @@ describe("IssueBoardSkeleton", () => {
 
   it("draws six bar rows in two groups of three, with no tree", async () => {
     const r = renderFrames(
-      <IssueBoardSkeleton tabs={tabsFromCategories()} width={100} height={24} />,
+      <IssueBoardSkeleton
+        tabs={tabsFromCategories()}
+        width={100}
+        height={24}
+      />,
     )
     await r.waitFor("█")
     const lines = r.lastFrame().split("\n")
@@ -332,7 +545,11 @@ describe("IssueBoardSkeleton", () => {
 
   it("ends its own footer with q quit and nothing else when unframed", async () => {
     const r = renderFrames(
-      <IssueBoardSkeleton tabs={tabsFromCategories()} width={100} height={24} />,
+      <IssueBoardSkeleton
+        tabs={tabsFromCategories()}
+        width={100}
+        height={24}
+      />,
     )
     await r.waitFor("quit")
     const last = r.lastFrame().trimEnd().split("\n").at(-1)!
