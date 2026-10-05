@@ -32,10 +32,12 @@ export type BoardRow = {
   updated: string
   /**
    * Set when the row's own status lags the evidence — an epic Off board with
-   * a child already started, a task whose PR is ahead of it. The board draws
-   * the word `behind` bright, then this string dim as the reason; pass `""`
-   * when the head's own note already says why. **Presence is the flag, so
-   * test `behind !== undefined`, never `if (row.behind)`.**
+   * a child already started, a task whose PR is ahead of it. On a task the
+   * board draws this string dim as the whole note (`PR #214 open`) — the word
+   * `behind` used to lead it and was dropped: the reason alone says what to
+   * do next, the label only said that something was off. On a container it
+   * silences the head's note instead. **Presence is the flag, so test
+   * `behind !== undefined`, never `if (row.behind)`.**
    *
    * Host-filled, because only the host knows the evidence outside Jira.
    * `withBehind` fills the two cases the board can see for itself.
@@ -53,9 +55,38 @@ const CATEGORIES: StatusCategory[] = ["new", "indeterminate", "done"]
 export const categoryOf = (key: string | undefined): StatusCategory =>
   CATEGORIES.find((c) => c === key) ?? "unknown"
 
+const ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+}
+
+/**
+ * Summaries arrive HTML-escaped from some Jira paths (`Account &amp; Statement`)
+ * and a terminal has no renderer to undo it, so the board does it once, where
+ * a summary enters. Named entities beyond the common few are left as they are
+ * rather than guessed at.
+ */
+export const decodeEntities = (text: string): string =>
+  text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
+    if (name[0] === "#") {
+      const code =
+        name[1]?.toLowerCase() === "x"
+          ? parseInt(name.slice(2), 16)
+          : parseInt(name.slice(1), 10)
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : whole
+    }
+    return ENTITIES[name.toLowerCase()] ?? whole
+  })
+
 export const toBoardRow = (issue: JiraIssue): BoardRow => ({
   key: issue.key,
-  summary: issue.fields.summary ?? "",
+  summary: decodeEntities(issue.fields.summary ?? ""),
   status: issue.fields.status?.name ?? "—",
   statusId: issue.fields.status?.id ?? "",
   category: categoryOf(issue.fields.status?.statusCategory?.key),
@@ -66,7 +97,7 @@ export const toBoardRow = (issue: JiraIssue): BoardRow => ({
     ? {
         parent: {
           key: issue.fields.parent.key,
-          summary: issue.fields.parent.fields?.summary ?? "",
+          summary: decodeEntities(issue.fields.parent.fields?.summary ?? ""),
         },
       }
     : {}),
@@ -225,9 +256,18 @@ export const rowsInTab = (
 ): BoardRow[] => rows.filter((r) => placement.tabsOf(r.key).includes(tab))
 
 /**
- * The dim segments after a head's summary: its own status when it differs
- * from this tab, then where the rest of its children are, with counts. Only
- * rows the board holds are counted — never the epic-children query.
+ * The dim note after a head's summary, read in under a second by someone who
+ * never saw the code: the epic's own status when it differs from this tab
+ * (`In progress`), then the single largest group of its children sitting in
+ * another tab (`+3 in QA`). One clause, not a census — every other tab's count
+ * is one keypress away, and a row listing four of them was read as noise.
+ * The word `own` used to prefix the status and was dropped for the same
+ * reason. Only rows the board holds are counted — never the epic-children
+ * query.
+ *
+ * A head that is `behind` says nothing: its own status there is the lagging
+ * one (`Off board` while its children are started), and repeating a status
+ * that is wrong told the reader nothing they could act on.
  */
 export const headNote = (
   row: BoardRow,
@@ -235,22 +275,26 @@ export const headNote = (
   tab: string,
   placement: Placement,
 ): string | undefined => {
-  if (!row.container) return undefined
+  if (!row.container || row.behind !== undefined) return undefined
   const labelOf = (value: string): string =>
     tabs.tabs.find((t) => t.value === value)?.label ?? ""
 
   const own = tabOf(row, tabs)
-  const segments = own === tab ? [] : [`own ${labelOf(own)}`]
+  const segments = own === tab ? [] : [labelOf(own)]
 
   const elsewhere = new Map<string, number>()
   for (const kid of placement.childrenOf(row.key)) {
     const where = tabOf(kid, tabs)
     if (where !== tab) elsewhere.set(where, (elsewhere.get(where) ?? 0) + 1)
   }
+  // Largest first; a tie goes to the earlier tab, so the note never flickers
+  // between two equal groups.
+  let largest: { label: string; n: number } | undefined
   for (const t of tabs.tabs) {
-    const n = elsewhere.get(t.value)
-    if (n) segments.push(`${n} ${t.label}`)
+    const n = elsewhere.get(t.value) ?? 0
+    if (n > (largest?.n ?? 0)) largest = { label: t.label, n }
   }
+  if (largest) segments.push(`+${largest.n} in ${largest.label}`)
 
   return segments.length ? segments.join(" · ") : undefined
 }
@@ -258,9 +302,9 @@ export const headNote = (
 /**
  * Fills `behind` for the two cases the board can see without leaving Jira:
  * an epic parked Off board while a child has already started, and an epic
- * still open when every child is Done. Both reasons are left empty — the
- * head's own note already names the status that lags. A `behind` the host
- * has already set is never overwritten.
+ * still open when every child is Done. Both reasons are left empty, and the
+ * head draws no note at all — see `headNote`. A `behind` the host has already
+ * set is never overwritten.
  */
 export const withBehind = (rows: BoardRow[], tabs: BoardTabs): BoardRow[] => {
   const placement = placementOf(rows, tabs)
@@ -401,21 +445,37 @@ export const blocksFor = <L = never>(
   )
 }
 
-const firstName = (assignee: string): string =>
-  assignee === "unassigned" ? "unassigned" : `@${assignee.split(" ")[0]}`
+/**
+ * The owner as a fence names them: `@` and a first name, or nothing.
+ *
+ * Jira's displayName is usually "First Last", but an account with no profile
+ * name hands back its email instead, and splitting that on a space printed the
+ * whole address on the fence. An email gives its local part's first token
+ * (`ada.okafor@example.com` → `@Ada`). Anything that still is not a plain
+ * name says nothing — a blank costs the reader less than an address does.
+ */
+export const firstName = (assignee: string): string => {
+  if (assignee === "unassigned") return "unassigned"
+  const local = assignee.includes("@") ? assignee.split("@")[0]! : assignee
+  const first = local.trim().split(/[\s._+-]+/)[0] ?? ""
+  if (!/^\p{L}[\p{L}']*$/u.test(first)) return ""
+  return `@${first[0]!.toUpperCase()}${first.slice(1)}`
+}
 
 /**
- * What a fence says after the parent's name, and whether it carries `behind`.
+ * What a fence says after the parent's name.
  *
  * Where the parent IS says it best: a tab label when the reader can press
  * through and find it, the OWNER when they cannot — `@` being the house glyph
- * for scope, as in the title bar's `@you`. On a `mine` board those two are
+ * for scope, as in the title bar's `@login`. On a `mine` board those two are
  * the same question asked twice, so a tab name means yours and `@name` means
  * not yours, and no fence ever says both. A board showing several assignees
- * has no such shorthand and always names the owner, as its rows do.
+ * has no such shorthand and always names the owner, as its rows do. An owner
+ * with no clean first name gets nothing — see `firstName`.
  *
- * `behind` is a judgement on someone's own work, so it goes on a fence only
- * when that someone is the viewer.
+ * Fences carried a bright `behind` for the viewer's own lagging epics until
+ * 2026-10-05, dropped with the rest of that word: it named a problem without
+ * saying what to do about it.
  *
  * Empty until the lookup lands: a fence that guessed would be wrong for a
  * frame and then silently correct itself, which is worse than a blank.
@@ -424,17 +484,29 @@ export const fenceNote = (
   parent: BoardRow | undefined,
   tabs: BoardTabs,
   { viewer, mine }: { viewer: string; mine: boolean },
-): { segment: string; behind: boolean } => {
-  if (!parent) return { segment: "", behind: false }
+): string => {
+  if (!parent) return ""
   const theirs = parent.assignee !== viewer
-  if (!mine || theirs)
-    return { segment: firstName(parent.assignee), behind: false }
+  if (!mine || theirs) return firstName(parent.assignee)
   const own = tabOf(parent, tabs)
-  return {
-    segment: tabs.tabs.find((t) => t.value === own)?.label ?? "",
-    behind: parent.behind !== undefined,
-  }
+  return tabs.tabs.find((t) => t.value === own)?.label ?? ""
 }
+
+/**
+ * A fence's label: the parent's key, then its title — `SHOP-350 Storefront
+ * refresh`. The key leads because it is the one part always present; the
+ * title came first until a parent whose summary the search did not carry drew
+ * as `── · SHOP-350`. The looked-up parent's summary fills that gap when the
+ * child's copy is empty.
+ */
+export const fenceLabel = (
+  block: Extract<Block<unknown>, { kind: "fence" }>,
+): string =>
+  block.key
+    ? [block.key, block.summary || block.parent?.summary || ""]
+        .filter(Boolean)
+        .join(" ")
+    : block.summary
 
 /** Index into `blocks` of the n-th stop, so a cursor over stops maps to a line. */
 export const blockIndexOfStop = <L>(

@@ -13,11 +13,12 @@ import {
 } from "@kud/ink-ui"
 import { looksLikeJql, type SearchMode } from "@kud/jira"
 import { Box, Text, useInput } from "ink"
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   blockIndexOfStop,
   blocksFor,
   countsFor,
+  fenceLabel,
   fenceNote,
   headNote,
   placementOf,
@@ -216,6 +217,15 @@ const rule = (label: string, width: number): string => {
   return head + "─".repeat(Math.max(0, width - [...head].length))
 }
 
+const lineKey = <L,>(block: Block<L>, at: number): string =>
+  block.kind === "issue"
+    ? block.row.key
+    : block.kind === "leaf"
+      ? `leaf:${block.parent.key}:${at}`
+      : block.kind === "fence"
+        ? `f:${block.key ?? "none"}`
+        : `gap:${at}`
+
 const FlashLine = ({ flash }: { flash: Flash }) => {
   if (flash.tone === "error") {
     return (
@@ -246,9 +256,11 @@ const tabLegendLine = (model: BoardModel): [string, string] =>
  * about to be is the only news on the line, and a note about where its
  * children are would read as if it had already landed.
  *
- * `behind` is a WORD, bright, and the only bright thing on an otherwise dim
- * line — a glyph would need a legend, and this has to be legible to a reader
- * who cannot tell the colour from the dim text beside it.
+ * Otherwise the note is dim, and it stays only if a reader who never saw the
+ * code knows from it, in under a second, what to do next: a task's `behind`
+ * reason (`PR #214 open`), or a head's `headNote`. The bright word `behind`
+ * that used to lead the first was dropped on 2026-10-05 — it said something
+ * was off without saying what.
  */
 const RowNote = ({ row, note }: { row: BoardRow; note?: string }) => {
   if (row.pending)
@@ -258,18 +270,14 @@ const RowNote = ({ row, note }: { row: BoardRow; note?: string }) => {
       </Box>
     )
 
-  const behind = row.behind !== undefined
-  const dim = [row.behind || "", note ?? ""].filter(Boolean).join(" · ")
-  if (!behind && !dim) return null
+  const dim = [row.container ? "" : (row.behind ?? ""), note ?? ""]
+    .filter(Boolean)
+    .join(" · ")
+  if (!dim) return null
 
   return (
     <Box flexShrink={0} paddingLeft={1}>
-      {behind ? (
-        <Text color={colors.warning} bold>
-          behind
-        </Text>
-      ) : null}
-      {dim ? <Text dimColor>{(behind ? " · " : "") + dim}</Text> : null}
+      <Text dimColor>{dim}</Text>
     </Box>
   )
 }
@@ -365,11 +373,46 @@ export const IssueBoard = <L = never,>({
     [narrowed, model.tabs, tab, placement, under, parents],
   )
   const stops = stopsOf(blocks)
-  const { cursor, setCursor } = useListCursor(stops.length, {
+  const { cursor: moved, setCursor } = useListCursor(stops.length, {
     vimKeys: true,
     isActive: isActive && listFocused,
   })
-  useEffect(() => setCursor(0), [tab, setCursor])
+  // The cursor is held by KEY, not by index. Rows re-sort when a host's leaves
+  // arrive and again on every refetch, and an index-held cursor stayed on the
+  // same line while a different row slid under it — so a host key acting on
+  // "the selected row" acted on whichever PR now sat there. Each tab also
+  // keeps its own: ←→ and back lands where you left it.
+  const keyOfLeaf = leaves?.keyOf
+  const stopKeys = stops.map((s) =>
+    s.kind === "issue"
+      ? s.row.key
+      : `${s.parent.key}>${keyOfLeaf?.(s.data) ?? ""}`,
+  )
+  //
+  // Worked out during render rather than corrected in an effect: a frame
+  // where the index still pointed at the old line would hand `onCursor` the
+  // wrong stop, and that frame is exactly when a keypress lands. The hook's
+  // index wins only when it MOVED since the last commit — that is ↑↓ — and
+  // otherwise the held key decides where the cursor is.
+  const heldKey = useRef(new Map<string, string>())
+  const committed = useRef({ tab, cursor: moved })
+  const switched = committed.current.tab !== tab
+  const held = heldKey.current.get(tab)
+  const anchored = held === undefined ? -1 : stopKeys.indexOf(held)
+  const userMoved = !switched && moved !== committed.current.cursor
+  const cursor = Math.max(
+    0,
+    Math.min(
+      userMoved ? moved : anchored >= 0 ? anchored : switched ? 0 : moved,
+      stops.length - 1,
+    ),
+  )
+  useEffect(() => {
+    committed.current = { tab, cursor }
+    const key = stopKeys[cursor]
+    if (key !== undefined) heldKey.current.set(tab, key)
+    if (moved !== cursor) setCursor(cursor)
+  })
 
   const at = stops[cursor]
   useEffect(() => {
@@ -562,93 +605,94 @@ export const IssueBoard = <L = never,>({
             const at = start + i
             const focused = at === focus
             const prefix = treePrefix(blocks, at)
-            return block.kind === "gap" ? (
-              <Text key={`gap:${at}`}> </Text>
-            ) : block.kind === "fence" ? (
-              (() => {
-                const { segment, behind } = fenceNote(
-                  block.parent,
-                  model.tabs,
-                  {
+            const line =
+              block.kind === "gap" ? (
+                <Text key={`gap:${at}`}> </Text>
+              ) : block.kind === "fence" ? (
+                (() => {
+                  const tail = fenceNote(block.parent, model.tabs, {
                     viewer,
                     mine: scope.kind === "mine",
-                  },
-                )
-                const tail = [behind ? "behind" : "", segment]
-                  .filter(Boolean)
-                  .join(" · ")
-                const label = block.key
-                  ? `${block.summary} · ${block.key}`
-                  : block.summary
-                return (
-                  <Box key={`f:${block.key ?? "none"}`} paddingLeft={4}>
-                    <Text dimColor>
-                      {rule(
-                        label,
-                        width - ROW_CHROME - (tail ? tail.length + 1 : 0),
-                      )}
-                    </Text>
-                    {tail ? (
-                      <Box flexShrink={0} paddingLeft={1}>
-                        {behind ? (
-                          <Text color={colors.warning} bold>
-                            behind
-                          </Text>
-                        ) : null}
-                        <Text dimColor>{(behind ? " · " : "") + segment}</Text>
-                      </Box>
-                    ) : null}
-                  </Box>
-                )
-              })()
-            ) : block.kind === "leaf" ? (
-              <SelectableRow
-                key={`leaf:${block.parent.key}:${leaves?.keyOf(block.data)}`}
-                active={focused}
-              >
-                <Box flexShrink={0} width={prefix.length}>
-                  <Text dimColor>{prefix}</Text>
-                </Box>
-                {leaves?.render(block.data, {
-                  active: focused,
-                  width: width - ROW_CHROME - prefix.length,
-                })}
-              </SelectableRow>
-            ) : (
-              <SelectableRow key={block.row.key} active={focused}>
-                {prefix ? (
+                  })
+                  const label = fenceLabel(block)
+                  return (
+                    <Box key={`f:${block.key ?? "none"}`} paddingLeft={4}>
+                      <Text dimColor>
+                        {rule(
+                          label,
+                          width - ROW_CHROME - (tail ? tail.length + 1 : 0),
+                        )}
+                      </Text>
+                      {tail ? (
+                        <Box flexShrink={0} paddingLeft={1}>
+                          <Text dimColor>{tail}</Text>
+                        </Box>
+                      ) : null}
+                    </Box>
+                  )
+                })()
+              ) : block.kind === "leaf" ? (
+                <SelectableRow
+                  key={`leaf:${block.parent.key}:${leaves?.keyOf(block.data)}`}
+                  active={focused}
+                >
                   <Box flexShrink={0} width={prefix.length}>
                     <Text dimColor>{prefix}</Text>
                   </Box>
-                ) : null}
-                <Box flexShrink={0} width={PRIORITY_WIDTH}>
-                  <Text color={priorityMarker(block.row.priority).color}>
-                    {priorityMarker(block.row.priority).marker}
-                  </Text>
-                </Box>
-                <Box flexShrink={0} width={keyWidth + CELL_AIR}>
-                  <Text color={colors.accent} bold={focused}>
-                    {block.row.key}
-                  </Text>
-                </Box>
-                <Box flexShrink={0} width={typeWidth + CELL_AIR}>
-                  <Pill tone="soft" variant={pillVariantFor(block.row)}>
-                    {block.row.type.toLowerCase()}
-                  </Pill>
-                </Box>
-                <Box flexGrow={1}>
-                  <Text wrap="truncate-end" bold={focused}>
-                    {block.row.summary}
-                  </Text>
-                </Box>
-                <RowNote
-                  row={block.row}
-                  note={headNote(block.row, model.tabs, tab, placement)}
-                />
-                <Box flexShrink={0} width={AGE_WIDTH} justifyContent="flex-end">
-                  <Text dimColor>{relativeAge(block.row.updated, now)}</Text>
-                </Box>
-              </SelectableRow>
+                  {leaves?.render(block.data, {
+                    active: focused,
+                    width: width - ROW_CHROME - prefix.length,
+                  })}
+                </SelectableRow>
+              ) : (
+                <SelectableRow key={block.row.key} active={focused}>
+                  {prefix ? (
+                    <Box flexShrink={0} width={prefix.length}>
+                      <Text dimColor>{prefix}</Text>
+                    </Box>
+                  ) : null}
+                  <Box flexShrink={0} width={PRIORITY_WIDTH}>
+                    <Text color={priorityMarker(block.row.priority).color}>
+                      {priorityMarker(block.row.priority).marker}
+                    </Text>
+                  </Box>
+                  <Box flexShrink={0} width={keyWidth + CELL_AIR}>
+                    <Text color={colors.accent} bold={focused}>
+                      {block.row.key}
+                    </Text>
+                  </Box>
+                  <Box flexShrink={0} width={typeWidth + CELL_AIR}>
+                    <Pill tone="soft" variant={pillVariantFor(block.row)}>
+                      {block.row.type.toLowerCase()}
+                    </Pill>
+                  </Box>
+                  <Box flexGrow={1}>
+                    <Text wrap="truncate-end" bold={focused}>
+                      {block.row.summary}
+                    </Text>
+                  </Box>
+                  <RowNote
+                    row={block.row}
+                    note={headNote(block.row, model.tabs, tab, placement)}
+                  />
+                  <Box
+                    flexShrink={0}
+                    width={AGE_WIDTH}
+                    justifyContent="flex-end"
+                  >
+                    <Text dimColor>{relativeAge(block.row.updated, now)}</Text>
+                  </Box>
+                </SelectableRow>
+              )
+            return (
+              <Box
+                key={lineKey(block, at)}
+                height={1}
+                flexShrink={0}
+                overflow="hidden"
+              >
+                {line}
+              </Box>
             )
           })
         )}

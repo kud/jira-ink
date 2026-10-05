@@ -1,6 +1,7 @@
 import { renderFrames } from "@kud/cli-testing"
 import { render } from "ink-testing-library"
 import { Box, Text } from "ink"
+import { useState } from "react"
 import { describe, expect, it, vi } from "vitest"
 import { mockBoard } from "../lib/board-mock.js"
 import { tabsFromCategories } from "../lib/board.js"
@@ -58,7 +59,7 @@ describe("IssueBoard", () => {
     const f = r.lastFrame()
     // SHOP-350 is nobody's row here, so it fences; SHOP-300 is a row and is
     // hauled in as a head instead, however far its own status is from this tab.
-    expect(f).toContain("── Storefront refresh · SHOP-350")
+    expect(f).toContain("── SHOP-350 Storefront refresh")
     expect(f).not.toContain("── Basket and checkout correctness")
     expect(f).toContain("└─")
     expect(f).toContain("── No epic")
@@ -72,8 +73,11 @@ describe("IssueBoard", () => {
       .lastFrame()
       .split("\n")
       .find((l) => l.includes("SHOP-300"))
-    expect(head).toContain("own To do")
-    expect(head).toMatch(/1 To do · 1 Done/)
+    expect(head).not.toContain("own")
+    // Its own status, then only the largest group elsewhere (a tie goes to
+    // the earlier tab).
+    expect(head).toContain("To do · +1 in To do")
+    expect(head).not.toContain("Done")
     r.unmount()
   })
 
@@ -160,6 +164,131 @@ describe("IssueBoard", () => {
     await settle()
     expect(onOpenLeaf).toHaveBeenCalledWith("#128")
     expect(onOpen).not.toHaveBeenCalled()
+    r.unmount()
+  })
+
+  it("never paints a fence rule through a row, however many leaves hang under it", async () => {
+    const m = mockBoard()
+    const prs = Array.from({ length: 9 }, (_, i) => `#${200 + i}`)
+    const r = mount({
+      model: m,
+      height: 14,
+      leaves: {
+        under: (row) => (row.key === "SHOP-412" ? prs : []),
+        keyOf: (l) => l,
+        // Wider than the cell it is given, as a real PR row can be.
+        render: (l, { width }) => (
+          <Text>{`PR ${l} `.padEnd(width + 12, "y")}</Text>
+        ),
+        onOpen: vi.fn(),
+      },
+    })
+    await r.waitFor("SHOP-412")
+    for (const _ of Array.from({ length: 12 })) {
+      r.write(DOWN)
+      await settle()
+    }
+    const lines = r.lastFrame().split("\n")
+    for (const line of lines.filter(
+      (l) => /SHOP-\d+ /.test(l) && !/^\s*──/.test(l),
+    ))
+      expect(line).not.toMatch(/─{3,}/)
+    r.unmount()
+  })
+
+  it("draws a task's behind reason alone, without the word behind", async () => {
+    const m = mockBoard()
+    const r = mount({
+      model: {
+        ...m,
+        rows: m.rows.map((row) =>
+          row.key === "SHOP-412" ? { ...row, behind: "PR #214 open" } : row,
+        ),
+      },
+    })
+    await r.waitFor("PR #214 open")
+    const line = r
+      .lastFrame()
+      .split("\n")
+      .find((l) => l.includes("SHOP-412"))!
+    expect(line).toContain("PR #214 open")
+    expect(line).not.toContain("behind")
+    r.unmount()
+  })
+
+  it("keeps the cursor on the same stop when the rows re-sort under it", async () => {
+    let reorder: () => void = () => {}
+    const seen: string[] = []
+    const Host = () => {
+      const [prs, setPrs] = useState(["#128", "#131"])
+      reorder = () => setPrs(["#131", "#128"])
+      return (
+        <IssueBoard<string>
+          model={mockBoard()}
+          viewer="Ada Okafor"
+          loadedAt={Date.now()}
+          scope={{ kind: "mine" }}
+          showingAll={false}
+          width={100}
+          height={24}
+          onOpen={vi.fn()}
+          onToggleAll={vi.fn()}
+          onRefresh={vi.fn()}
+          onSearch={vi.fn()}
+          onClearSearch={vi.fn()}
+          leaves={{
+            under: (row) => (row.key === "SHOP-412" ? prs : []),
+            keyOf: (l) => l,
+            render: (l, { active }) => (
+              <Text>{`PR ${l} ${active ? "on" : "off"}`}</Text>
+            ),
+            onOpen: vi.fn(),
+          }}
+          onCursor={(at) =>
+            seen.push(at?.stop.kind === "leaf" ? at.stop.data : "row")
+          }
+        />
+      )
+    }
+    const r = renderFrames(<Host />)
+    await r.waitFor("#131")
+    for (const _ of [0, 1]) {
+      r.write(DOWN)
+      await settle()
+    }
+    await r.waitFor("PR #128 on")
+    seen.length = 0
+    reorder()
+    await settle()
+    await settle()
+    expect(r.lastFrame()).toContain("PR #128 on")
+    expect(r.lastFrame()).toContain("PR #131 off")
+    // Never one frame on the PR that slid into its place.
+    expect(seen).not.toContain("#131")
+    r.unmount()
+  })
+
+  it("remembers each tab's cursor across ←→", async () => {
+    const r = mount()
+    await r.waitFor("SHOP-412")
+    r.write(DOWN)
+    await settle()
+    r.write(DOWN)
+    await settle()
+    const before = r
+      .lastFrame()
+      .split("\n")
+      .find((l) => l.includes("❯"))!
+    r.write(RIGHT)
+    await settle()
+    r.write(LEFT)
+    await settle()
+    await settle()
+    const after = r
+      .lastFrame()
+      .split("\n")
+      .find((l) => l.includes("❯"))!
+    expect(after).toBe(before)
     r.unmount()
   })
 

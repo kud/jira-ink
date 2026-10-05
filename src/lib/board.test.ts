@@ -5,7 +5,10 @@ import {
   blocksFor,
   boardOf,
   countsFor,
+  decodeEntities,
+  fenceLabel,
   fenceNote,
+  firstName,
   headNote,
   OFF_BOARD,
   parentsOf,
@@ -287,9 +290,9 @@ describe("leaves", () => {
   })
 
   it("hangs leaves under a fenced row and under a plain-list row alike", () => {
-    expect(shape(blocksFor([row({ key: "A-3", parent: epic })], under))).toEqual(
-      ["F:Checkout", "└A-3", "└└#4"],
-    )
+    expect(
+      shape(blocksFor([row({ key: "A-3", parent: epic })], under)),
+    ).toEqual(["F:Checkout", "└A-3", "└└#4"])
     expect(shape(blocksFor([row({ key: "A-3" })], under))).toEqual([
       "A-3",
       "└#4",
@@ -347,7 +350,10 @@ describe("leaves", () => {
 
   it("drops the stem under the last child, and a lone child closes at once", () => {
     const blocks = blocksFor(
-      [row({ key: "SHOP-300", container: true }), row({ key: "A-1", parent: epic })],
+      [
+        row({ key: "SHOP-300", container: true }),
+        row({ key: "A-1", parent: epic }),
+      ],
       under,
     )
     expect(blocks.map((_, i) => treePrefix(blocks, i))).toEqual([
@@ -357,7 +363,9 @@ describe("leaves", () => {
       "   ├─ ",
       "   └─ ",
     ])
-    expect(treePrefix(blocksFor([row({ key: "A-3", parent: epic })]), 1)).toBe("└─ ")
+    expect(treePrefix(blocksFor([row({ key: "A-3", parent: epic })]), 1)).toBe(
+      "└─ ",
+    )
   })
 })
 
@@ -454,12 +462,35 @@ describe("bottom-up placement", () => {
     const p = placementOf(rows, tabs)
     const head = rows[0]!
     expect(headNote(head, tabs, value("Review"), p)).toBe(
-      "own In progress · 2 Backlog",
+      "In progress · +2 in Backlog",
     )
     expect(headNote(head, tabs, value("Backlog"), p)).toBe(
-      "own In progress · 1 Review",
+      "In progress · +1 in Review",
     )
     expect(headNote(rows[1]!, tabs, value("Review"), p)).toBeUndefined()
+  })
+
+  it("names only the largest group of children elsewhere", () => {
+    const rows = [
+      at("SHOP-300", "In Progress", { container: true }),
+      at("A-1", "Code Review", { parent: epic }),
+      at("A-2", "To Do", { parent: epic }),
+      at("A-3", "To Do", { parent: epic }),
+      at("A-4", "In Progress", { parent: epic }),
+    ]
+    expect(
+      headNote(rows[0]!, tabs, value("In progress"), placementOf(rows, tabs)),
+    ).toBe("+2 in Backlog")
+  })
+
+  it("says nothing on a head that is behind", () => {
+    const rows = [
+      at("SHOP-300", "To Do", { container: true, behind: "" }),
+      at("A-1", "Code Review", { parent: epic }),
+    ]
+    expect(
+      headNote(rows[0]!, tabs, value("Review"), placementOf(rows, tabs)),
+    ).toBeUndefined()
   })
 
   it("omits the children note when every child is here", () => {
@@ -479,7 +510,7 @@ describe("bottom-up placement", () => {
     ]
     expect(
       headNote(rows[0]!, tabs, value("Review"), placementOf(rows, tabs)),
-    ).toBe("own Backlog")
+    ).toBe("Backlog")
   })
 })
 
@@ -489,8 +520,12 @@ describe("behind", () => {
     { label: "In progress", statuses: ["In Progress"] },
     { label: "Review", statuses: ["Code Review"] },
   ])
-  const at = (key: string, status: string, category: BoardRow["category"], over: Partial<BoardRow> = {}) =>
-    row({ key, status, statusId: status, category, ...over })
+  const at = (
+    key: string,
+    status: string,
+    category: BoardRow["category"],
+    over: Partial<BoardRow> = {},
+  ) => row({ key, status, statusId: status, category, ...over })
 
   it("marks an epic parked Off board once a child has started", () => {
     const rows = withBehind(
@@ -530,7 +565,10 @@ describe("behind", () => {
   it("never overwrites a reason the host filled in", () => {
     const rows = withBehind(
       [
-        at("SHOP-300", "Someday", "new", { container: true, behind: "PR #12 open" }),
+        at("SHOP-300", "Someday", "new", {
+          container: true,
+          behind: "PR #12 open",
+        }),
         at("A-1", "Code Review", "indeterminate", { parent: epic }),
       ],
       tabs,
@@ -546,45 +584,92 @@ describe("fence notes", () => {
   ])
   const mine = { viewer: "Ada Okafor", mine: true }
   const parent = (over: Partial<BoardRow>) =>
-    row({ key: "SHOP-350", container: true, status: "Backlog", statusId: "Backlog", ...over })
+    row({
+      key: "SHOP-350",
+      container: true,
+      status: "Backlog",
+      statusId: "Backlog",
+      ...over,
+    })
 
   it("names the tab when the parent is the viewer's own", () => {
-    expect(fenceNote(parent({}), tabs, mine)).toEqual({
-      segment: "Backlog",
-      behind: false,
-    })
+    expect(fenceNote(parent({}), tabs, mine)).toBe("Backlog")
   })
 
   it("names the owner when the parent is someone else's, and never both", () => {
-    expect(fenceNote(parent({ assignee: "Priya Raman" }), tabs, mine)).toEqual({
-      segment: "@Priya",
-      behind: false,
-    })
-    expect(fenceNote(parent({ assignee: "unassigned" }), tabs, mine)).toEqual({
-      segment: "unassigned",
-      behind: false,
-    })
-  })
-
-  it("carries behind only when the parent is the viewer's", () => {
-    expect(fenceNote(parent({ behind: "" }), tabs, mine).behind).toBe(true)
-    expect(
-      fenceNote(parent({ behind: "", assignee: "Priya Raman" }), tabs, mine)
-        .behind,
-    ).toBe(false)
+    expect(fenceNote(parent({ assignee: "Priya Raman" }), tabs, mine)).toBe(
+      "@Priya",
+    )
+    expect(fenceNote(parent({ assignee: "unassigned" }), tabs, mine)).toBe(
+      "unassigned",
+    )
   })
 
   it("names the owner on a board that is not scoped to one assignee", () => {
     expect(
-      fenceNote(parent({}), tabs, { viewer: "Ada Okafor", mine: false }).segment,
+      fenceNote(parent({}), tabs, { viewer: "Ada Okafor", mine: false }),
     ).toBe("@Ada")
   })
 
   it("stays empty until the lookup lands", () => {
-    expect(fenceNote(undefined, tabs, mine)).toEqual({
-      segment: "",
-      behind: false,
-    })
+    expect(fenceNote(undefined, tabs, mine)).toBe("")
+  })
+
+  it("names an owner whose display name is an email by first name, never the address", () => {
+    expect(
+      fenceNote(parent({ assignee: "ada.okafor@example.com" }), tabs, mine),
+    ).toBe("@Ada")
+    expect(firstName("priya@example.com")).toBe("@Priya")
+    expect(firstName("Priya Raman")).toBe("@Priya")
+  })
+
+  it("says nothing when no clean first name can be derived", () => {
+    expect(firstName("x9-builds@example.com")).toBe("")
+    expect(firstName("1234@example.com")).toBe("")
+    expect(firstName("")).toBe("")
+  })
+
+  it("labels a fence key first, then the parent's title, wherever the title comes from", () => {
+    const fence = { kind: "fence" as const, key: "SHOP-350", summary: "" }
+    expect(fenceLabel({ ...fence, summary: "Storefront refresh" })).toBe(
+      "SHOP-350 Storefront refresh",
+    )
+    expect(
+      fenceLabel({
+        ...fence,
+        parent: parent({ summary: "Storefront refresh" }),
+      }),
+    ).toBe("SHOP-350 Storefront refresh")
+    expect(fenceLabel(fence)).toBe("SHOP-350")
+    expect(fenceLabel({ kind: "fence", key: null, summary: "No epic" })).toBe(
+      "No epic",
+    )
+  })
+})
+
+describe("summaries", () => {
+  it("decodes the HTML entities Jira sometimes escapes summaries with", () => {
+    expect(decodeEntities("Account &amp; Statement Period")).toBe(
+      "Account & Statement Period",
+    )
+    expect(decodeEntities("&lt;b&gt; &quot;x&quot; it&#39;s &#x2014;")).toBe(
+      '<b> "x" it\'s —',
+    )
+    expect(decodeEntities("AT&T &unknown; & plain")).toBe(
+      "AT&T &unknown; & plain",
+    )
+  })
+
+  it("decodes where a summary enters the board, parent included", () => {
+    const r = toBoardRow({
+      key: "SHOP-1",
+      fields: {
+        summary: "Tax &amp; duties",
+        parent: { key: "SHOP-2", fields: { summary: "Fees &lt;EU&gt;" } },
+      },
+    } as unknown as JiraIssue)
+    expect(r.summary).toBe("Tax & duties")
+    expect(r.parent?.summary).toBe("Fees <EU>")
   })
 })
 
@@ -597,7 +682,11 @@ describe("transitions", () => {
     tabs,
     rows: [row({ key: "A-1", status: "Backlog", statusId: "Backlog" })],
   }
-  const to = { id: "10500", name: "Ready for QA", category: "indeterminate" as const }
+  const to = {
+    id: "10500",
+    name: "Ready for QA",
+    category: "indeterminate" as const,
+  }
 
   it("names the tab a transition lands in, by id and not by name", () => {
     expect(tabLabelOf(to, tabs)).toBe("QA")
@@ -634,7 +723,10 @@ describe("transitions", () => {
 
 describe("parentsOf", () => {
   const issue = (key: string): JiraIssue =>
-    ({ key, fields: { summary: key, assignee: { displayName: "Priya Raman" } } }) as JiraIssue
+    ({
+      key,
+      fields: { summary: key, assignee: { displayName: "Priya Raman" } },
+    }) as JiraIssue
 
   it("asks once for every parent the board holds no row for, and never twice for one", async () => {
     const searchIssues = vi.fn(async (_jql: string) => [issue("SHOP-350")])
