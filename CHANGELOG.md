@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.14.0 — 2026-10-05
+
+### Highlights
+
+- **Board rows can no longer be painted over.** Each line is now a fixed one-line box, so a long host leaf such as a PR row no longer wraps and lets a fence rule show through a task row. ([2c95dae](https://github.com/kud/jira-ink/commit/2c95daeb155b5f765f8dc22ee54b164f69eebfa8))
+- **The cursor stays put when rows re-sort.** It follows the row or leaf it was on as leaves arrive or the board refetches, and each tab remembers its own cursor across `←→`. ([2c95dae](https://github.com/kud/jira-ink/commit/2c95daeb155b5f765f8dc22ee54b164f69eebfa8))
+- **Row notes are quieter and clearer.** The word `behind` is gone: a task shows its reason alone (`PR #214 open`), a behind container shows no note, and an epic head shows its own status then only the largest group elsewhere as `+N in <tab>`. ([2c95dae](https://github.com/kud/jira-ink/commit/2c95daeb155b5f765f8dc22ee54b164f69eebfa8))
+- **Fences read better.** Labels are `KEY title`, falling back to the parent's summary when the child's copy is empty, and the owner shows as `@FirstName`, or nothing rather than an email. ([2c95dae](https://github.com/kud/jira-ink/commit/2c95daeb155b5f765f8dc22ee54b164f69eebfa8))
+- **HTML entities in summaries are decoded,** so `&amp;` and numeric forms display as the characters they stand for, parent summaries included. ([2c95dae](https://github.com/kud/jira-ink/commit/2c95daeb155b5f765f8dc22ee54b164f69eebfa8))
+- **`@kud/ink-ui` is now 0.33.0.** ([a8b643b](https://github.com/kud/jira-ink/commit/a8b643ba5e6f6db44476a9567bba96e3a2ef0a70))
+
+**Breaking for direct callers:** `fenceNote` now returns a string instead of `{ segment, behind }`. New exports: `fenceLabel`, `firstName` and `decodeEntities`.
+
+---
+
 ## 0.13.0 — 2026-10-02
 
 ### Highlights
