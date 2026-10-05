@@ -1,4 +1,4 @@
-import { colors, getIconMode, setIconMode } from "@kud/ink-ui"
+import { colors, getIconMode, priorityColors, setIconMode } from "@kud/ink-ui"
 import { afterEach, describe, expect, it } from "vitest"
 import { priorityMarker } from "./priority-marker.js"
 
@@ -6,35 +6,45 @@ describe("priorityMarker", () => {
   const mode = getIconMode()
   afterEach(() => setIconMode(mode))
 
-  // Text mode keeps Jira's arrows. The top rung moved from warning to error,
-  // in both modes, so it reads as more urgent than high rather than the same.
-  it("draws text arrows, the top rung in error", () => {
+  // Text mode keeps Jira's arrows. Each rung wears ink-ui's priority tone, in
+  // both modes: lightness steps down the ladder, the glyph carries the rank.
+  it("draws text arrows in the priority tones", () => {
     setIconMode("text")
     expect(priorityMarker("Highest")).toEqual({
       marker: "⇈",
-      color: colors.error,
+      color: priorityColors.highest,
       rank: "highest",
     })
     expect(priorityMarker("High")).toEqual({
       marker: "↑",
-      color: colors.warning,
+      color: priorityColors.high,
       rank: "high",
     })
     expect(priorityMarker("Medium")).toEqual({
       marker: "=",
-      color: colors.muted,
+      color: priorityColors.medium,
       rank: "medium",
     })
     expect(priorityMarker("Low")).toEqual({
       marker: "↓",
-      color: colors.info,
+      color: priorityColors.low,
       rank: "low",
     })
     expect(priorityMarker("Lowest")).toEqual({
       marker: "⇊",
-      color: colors.info,
+      color: priorityColors.lowest,
       rank: "lowest",
     })
+  })
+
+  // A red or amber chevron reads as a failure or a warning beside a status
+  // that says neither, which is why the ladder left the state hues.
+  it("never paints a rung in a state hue", () => {
+    for (const name of ["Highest", "High", "Medium", "Low", "Lowest"]) {
+      const { color } = priorityMarker(name)
+      expect(color).not.toBe(colors.error)
+      expect(color).not.toBe(colors.warning)
+    }
   })
 
   // Nerd mode draws Material Design chevrons, one column each; the colours
@@ -43,27 +53,27 @@ describe("priorityMarker", () => {
     setIconMode("nerd")
     expect(priorityMarker("Highest")).toEqual({
       marker: "\u{F013F}",
-      color: colors.error,
+      color: priorityColors.highest,
       rank: "highest",
     })
     expect(priorityMarker("High")).toEqual({
       marker: "\u{F0143}",
-      color: colors.warning,
+      color: priorityColors.high,
       rank: "high",
     })
     expect(priorityMarker("Medium")).toEqual({
       marker: "\u{F01FC}",
-      color: colors.muted,
+      color: priorityColors.medium,
       rank: "medium",
     })
     expect(priorityMarker("Low")).toEqual({
       marker: "\u{F0140}",
-      color: colors.info,
+      color: priorityColors.low,
       rank: "low",
     })
     expect(priorityMarker("Lowest")).toEqual({
       marker: "\u{F013C}",
-      color: colors.info,
+      color: priorityColors.lowest,
       rank: "lowest",
     })
   })

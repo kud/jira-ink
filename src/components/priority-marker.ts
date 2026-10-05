@@ -1,4 +1,4 @@
-import { colors, getIconMode } from "@kud/ink-ui"
+import { getIconMode, priorityColors } from "@kud/ink-ui"
 import { priorityRank, type PriorityRank } from "../lib/board.js"
 
 export type PriorityMarker = {
@@ -28,15 +28,16 @@ const NERD: Record<PriorityRank, string> = {
   none: " ",
 }
 
-// The top rung in error, high in warning, the default rung muted, the two
-// below in info — urgency reads top-down, and the doubled chevron tells the
-// top rung apart from high within its own bin by shape, not by a second hue.
+// Priority is ordinal, so it steps in lightness, never hue: ink-ui's
+// `priorityColors` keep a red chevron from claiming a failure. The glyph
+// carries the rank, and the doubled chevron tells the top rung apart from high
+// where the two share a tone.
 const COLOUR: Record<PriorityRank, string | undefined> = {
-  highest: colors.error,
-  high: colors.warning,
-  medium: colors.muted,
-  low: colors.info,
-  lowest: colors.info,
+  highest: priorityColors.highest,
+  high: priorityColors.high,
+  medium: priorityColors.medium,
+  low: priorityColors.low,
+  lowest: priorityColors.lowest,
   none: undefined,
 }
 
