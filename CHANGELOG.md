@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.17.0 — 2026-10-05
+
+### Breaking Changes
+
+- **`@kud/ink-ui` 0.36.0 or later is now required.** The peer range rises from `>=0.33.0 <1` to `>=0.36.0 <1`; a host on an older version would draw priority markers with no colour, so upgrade `@kud/ink-ui` first. ([153882d](https://github.com/kud/jira-ink/commit/153882deab748c6f927888f6a1129e8fa146a3c2))
+
+### Highlights
+
+- **Priority markers change colour: the highest priority is no longer red.** They now use ink-ui's shared `priorityColors`, shades of grey by rank, in place of jira-ink's own hexes. ([153882d](https://github.com/kud/jira-ink/commit/153882deab748c6f927888f6a1129e8fa146a3c2))
+
+---
+
 ## 0.16.1 — 2026-10-05
 
 ### Fixes
