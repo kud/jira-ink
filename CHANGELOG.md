@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.16.1 — 2026-10-05
+
+### Fixes
+
+- **jira-ink now installs alongside `@kud/ink-ui` 0.34.0 and later.** The peer range widens from `^0.33.0` to `>=0.33.0 <1`, since on a 0.x version the caret admitted only 0.33.x and blocked newer hosts. ([a3b48ad](https://github.com/kud/jira-ink/commit/a3b48ad1aaee0b599cdcca53c05b5dfc48a528cd))
+
+<details>
+<summary>Internal (1 commit)</summary>
+
+- Dev dependency `@kud/ink-ui` moves to 0.34.0.
+
+</details>
+
+---
+
 ## 0.16.0 — 2026-10-05
 
 ### Fixes
