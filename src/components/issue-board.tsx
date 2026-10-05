@@ -1,6 +1,7 @@
 import {
   colors,
   FooterHints,
+  getIconMode,
   Pill,
   pillWidth,
   SelectableRow,
@@ -189,10 +190,20 @@ const KEY_MIN_WIDTH = 8
 const CELL_AIR = 2
 const AGE_WIDTH = 5
 
+const priorityLegend = (): [string, string][] =>
+  getIconMode() === "nerd"
+    ? [
+        ["\u{F013F} \u{F0143}", "priority above the default"],
+        ["\u{F01FC}", "default priority"],
+        ["\u{F0140} \u{F013C}", "priority below the default"],
+      ]
+    : [
+        ["⇈ ↑", "priority above the default"],
+        ["=", "default priority"],
+        ["↓ ⇊", "priority below the default"],
+      ]
+
 const LEGEND: [string, string][] = [
-  ["⇈ ↑", "priority above the default"],
-  ["=", "default priority"],
-  ["↓ ⇊", "priority below the default"],
   ["── epic ──", "a parent not in this tab; its rows hang beneath"],
   ["├─ └─", "a row under the container above it; └─ is the last"],
   ["story · bug · task", "issue type"],
@@ -588,14 +599,16 @@ export const IssueBoard = <L = never,>({
 
       <Box flexDirection="column" marginTop={1} height={size} paddingRight={1}>
         {legend ? (
-          [...LEGEND, tabLegendLine(model)].map(([glyph, meaning]) => (
-            <Box key={glyph} paddingLeft={4}>
-              <Box width={28} flexShrink={0}>
-                <Text color={colors.accent}>{glyph}</Text>
+          [...priorityLegend(), ...LEGEND, tabLegendLine(model)].map(
+            ([glyph, meaning]) => (
+              <Box key={glyph} paddingLeft={4}>
+                <Box width={28} flexShrink={0}>
+                  <Text color={colors.accent}>{glyph}</Text>
+                </Box>
+                <Text dimColor>{meaning}</Text>
               </Box>
-              <Text dimColor>{meaning}</Text>
-            </Box>
-          ))
+            ),
+          )
         ) : stops.length === 0 ? (
           <Box paddingLeft={4}>
             <Text dimColor>{emptyHint()}</Text>

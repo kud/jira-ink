@@ -575,33 +575,38 @@ export const subtreeOf = <L>(blocks: Block<L>[], i: number): Block<L>[] => {
 
 // ─── row glyphs ───────────────────────────────────────────────────────────────
 
-export type PriorityGlyph = "⇈" | "↑" | "=" | "↓" | "⇊" | " "
+export type PriorityRank =
+  "highest" | "high" | "medium" | "low" | "lowest" | "none"
 
 /**
- * Rank against the scheme's default rung, in Jira's own arrow grammar: two
- * rungs above draws `⇈`, one `↑`, the default `=`, one below `↓`, two `⇊`.
+ * Rank against the scheme's default rung: two rungs above, one above, the
+ * default, one below, two below — or `none` for a priority we cannot place.
+ * The glyph is chosen downstream by icon mode (`priorityMarker`), so this
+ * stays a rank: text mode draws Jira's own arrow grammar (`⇈` `↑` `=` `↓`
+ * `⇊`, blank for `none`), Nerd Font mode Material Design chevrons.
  *
- * Five glyphs, not three, and the normal rung gets one. The column used to
+ * Five rungs, not three, and the normal rung gets one. The column used to
  * mark the two ends only (`▲` / `▼`, nothing for normal), which on a four-rung
  * scheme — P1 to P4, the common shape — put a mark on half the rows, drew P2
  * as if it were normal, and made P3 and P4 identical. And a blank beside a
  * marked row read as MISSING rather than as normal: the absent-vs-zero
- * distinction, one glyph at a time. So `=` says "we looked, it is normal",
- * and the blank finally means only "no priority, or one we cannot place".
+ * distinction, one glyph at a time. So `medium` says "we looked, it is
+ * normal", and `none` finally means only "no priority, or one we cannot
+ * place".
  *
  * Names are per-instance, so this matches the default scheme, the common
  * renames and the P0–P5 ladder rather than an exact list. Deriving rank from
  * the instance's ordered priority list, with its default flag, is the honest
  * version of this and where it goes next; the names are the fallback.
  */
-export const priorityGlyph = (name: string | null): PriorityGlyph => {
+export const priorityRank = (name: string | null): PriorityRank => {
   const n = (name ?? "").trim().toLowerCase()
-  if (/^(highest|blocker|critical|p[01])$/.test(n)) return "⇈"
-  if (/^(high|urgent|major|p2)$/.test(n)) return "↑"
-  if (/^(medium|normal|p3)$/.test(n)) return "="
-  if (/^(low|minor|p4)$/.test(n)) return "↓"
-  if (/^(lowest|trivial|p5)$/.test(n)) return "⇊"
-  return " "
+  if (/^(highest|blocker|critical|p[01])$/.test(n)) return "highest"
+  if (/^(high|urgent|major|p2)$/.test(n)) return "high"
+  if (/^(medium|normal|p3)$/.test(n)) return "medium"
+  if (/^(low|minor|p4)$/.test(n)) return "low"
+  if (/^(lowest|trivial|p5)$/.test(n)) return "lowest"
+  return "none"
 }
 
 const UNITS: [number, string][] = [

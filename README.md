@@ -135,7 +135,7 @@ const model = await boardOf(client, "assignee = currentUser() ORDER BY updated D
 | `tabsFromConfig` · `tabsFromBoard` · `tabsFromCategories` | The three tab sources, each a `BoardTabs` with its `source` named                                                        |
 | `tabOf` · `countsFor` · `visibleTabs`                     | Which tab a row belongs to, per-tab counts, which tabs to draw                                                           |
 | `blocksFor`                                               | One tab's rows as drawn: container rows head their group, absent parents get a fence, orphans last, a gap between groups |
-| `priorityGlyph` · `relativeAge` · `pillVariantFor`        | Row glyphs                                                                                                               |
+| `priorityRank` · `relativeAge` · `pillVariantFor`        | Row glyphs                                                                                                               |
 | `mockBoard` · `MOCK_BOARD_ROWS`                           | An invented board for screenshots and tests                                                                              |
 
 ## Development

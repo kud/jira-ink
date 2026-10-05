@@ -115,7 +115,7 @@ export type IssueDetailViewProps = {
 const FactsLine = ({ issue }: { issue: IssueDetail }) => {
   const priority = priorityMarker(issue.priority ?? null)
   const lead =
-    priority.marker !== " " && priority.marker !== "=" ? (
+    priority.rank !== "none" && priority.rank !== "medium" ? (
       <>
         <Text color={priority.color}>{priority.marker}</Text>
         <Text> {issue.priority}</Text>

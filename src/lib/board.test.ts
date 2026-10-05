@@ -14,7 +14,7 @@ import {
   parentsOf,
   pendingRow,
   placementOf,
-  priorityGlyph,
+  priorityRank,
   relativeAge,
   rowsInTab,
   settleRow,
@@ -371,20 +371,20 @@ describe("leaves", () => {
 
 describe("row glyphs", () => {
   it("ranks a priority against the default rung, P-ladder included", () => {
-    // Five rungs, in Jira's own arrow grammar, and the default rung gets a
-    // glyph of its own — a blank beside a marked row read as MISSING, not as
-    // normal. Only a priority we cannot place stays blank.
-    expect(priorityGlyph("Highest")).toBe("⇈")
-    expect(priorityGlyph("P1")).toBe("⇈")
-    expect(priorityGlyph("High")).toBe("↑")
-    expect(priorityGlyph("P2")).toBe("↑")
-    expect(priorityGlyph("Medium")).toBe("=")
-    expect(priorityGlyph("P3")).toBe("=")
-    expect(priorityGlyph("Low")).toBe("↓")
-    expect(priorityGlyph("P4")).toBe("↓")
-    expect(priorityGlyph("Lowest")).toBe("⇊")
-    expect(priorityGlyph(null)).toBe(" ")
-    expect(priorityGlyph("Whenever")).toBe(" ")
+    // Five rungs, and the default rung gets a rank of its own — a blank
+    // beside a marked row read as MISSING, not as normal. Only a priority we
+    // cannot place ranks as none; the glyph is chosen downstream by icon mode.
+    expect(priorityRank("Highest")).toBe("highest")
+    expect(priorityRank("P1")).toBe("highest")
+    expect(priorityRank("High")).toBe("high")
+    expect(priorityRank("P2")).toBe("high")
+    expect(priorityRank("Medium")).toBe("medium")
+    expect(priorityRank("P3")).toBe("medium")
+    expect(priorityRank("Low")).toBe("low")
+    expect(priorityRank("P4")).toBe("low")
+    expect(priorityRank("Lowest")).toBe("lowest")
+    expect(priorityRank(null)).toBe("none")
+    expect(priorityRank("Whenever")).toBe("none")
   })
 
   it("renders age in the largest whole unit", () => {
