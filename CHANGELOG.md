@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.16.0 — 2026-10-05
+
+### Fixes
+
+- **A host's `setIconMode("nerd")` now reaches jira-ink,** so priority markers show their Nerd Font glyphs instead of text arrows. `@kud/ink-ui` is now a peer dependency (`^0.33.0`), so both share one copy and its icon mode. ([f4cea19](https://github.com/kud/jira-ink/commit/f4cea1990f3c7db50fbf10e9f30cd270e3b3991b))
+
+**Heads-up for hosts:** `@kud/ink-ui` is no longer bundled as a dependency, so the host must install it itself (`^0.33.0`).
+
+---
+
 ## 0.15.0 — 2026-10-05
 
 ### Highlights
