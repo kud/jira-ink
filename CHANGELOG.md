@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.15.0 — 2026-10-05
+
+### Highlights
+
+- **Priority markers are easier to read in Nerd Font mode.** With ink-ui `setIconMode("nerd")` they draw Material Design chevrons (double up, up, equal, down, double down) in place of the arrows, which were too small. Text mode keeps `⇈ ↑ = ↓ ⇊`. ([34abf18](https://github.com/kud/jira-ink/commit/34abf1805525a9614fc510859e3ffdf08f3d690c))
+- **The board legend follows the icon mode,** so it shows the same priority glyphs as the rows. ([34abf18](https://github.com/kud/jira-ink/commit/34abf1805525a9614fc510859e3ffdf08f3d690c))
+- **The highest priority now stands out in red,** drawn in the error colour in both icon modes. ([34abf18](https://github.com/kud/jira-ink/commit/34abf1805525a9614fc510859e3ffdf08f3d690c))
+
+**Breaking for direct callers:** `priorityGlyph`/`PriorityGlyph` are renamed `priorityRank`/`PriorityRank`, which return a rank (`"highest" | "high" | "medium" | "low" | "lowest" | "none"`). `PriorityMarker` gains `rank` and `marker` is now typed `string`, so branch on `rank`, not the glyph.
+
+---
+
 ## 0.14.0 — 2026-10-05
 
 ### Highlights
