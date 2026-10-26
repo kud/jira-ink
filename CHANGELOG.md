@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.17.1 — 2026-10-26
+
+### Fixes
+
+- **jira-ink now installs alongside `ink` 8 without a peer conflict.** `@kud/ink-markdown` moves to 0.3.3, whose `ink` peer widens from 7.x to `>=7`. ([929c0d5](https://github.com/kud/jira-ink/commit/929c0d5831f6906c69f6667e6d2b18a16264eb64))
+
+---
+
 ## 0.17.0 — 2026-10-05
 
 ### Breaking Changes
