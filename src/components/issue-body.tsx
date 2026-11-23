@@ -1,7 +1,7 @@
 import { exec } from "node:child_process"
 import type { JiraClient } from "@kud/jira"
 import { LoadingScreen, StatusMessage } from "@kud/ink-ui"
-import { Box, useStdout } from "ink"
+import { Box, useWindowSize } from "ink"
 import { useEffect, useState, type ReactNode } from "react"
 import { issueDetailOf, type IssueDetail } from "../lib/issue-detail.js"
 import {
@@ -10,20 +10,8 @@ import {
 } from "./issue-detail-view.js"
 
 const useTermSize = () => {
-  const { stdout } = useStdout()
-  const [size, setSize] = useState({
-    cols: stdout.columns || 80,
-    rows: stdout.rows || 24,
-  })
-  useEffect(() => {
-    const onResize = () =>
-      setSize({ cols: stdout.columns || 80, rows: stdout.rows || 24 })
-    stdout.on("resize", onResize)
-    return () => {
-      stdout.off("resize", onResize)
-    }
-  }, [stdout])
-  return size
+  const { columns, rows } = useWindowSize()
+  return { cols: columns || 80, rows: rows || 24 }
 }
 
 const openInBrowser = (url: string) => {
