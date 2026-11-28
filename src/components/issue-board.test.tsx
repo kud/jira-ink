@@ -12,6 +12,10 @@ import {
   type IssueBoardProps,
 } from "./issue-board.js"
 
+// ink-ui draws a tab's count as a chip capped with powerline glyphs.
+const chip = (label: string, count: number | string): string =>
+  `${label} \ue0b6${count}\ue0b4`
+
 const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
 const LEFT = "\u001b[D"
 const DOWN = "\u001b[B"
@@ -46,9 +50,9 @@ describe("IssueBoard", () => {
     const f = r.lastFrame()
     // The epic is counted in each of the three tabs it heads a group in —
     // placement is bottom-up, so it is a row in all three and nowhere else.
-    expect(f).toContain("To do (2)")
-    expect(f).toContain("In progress (5)")
-    expect(f).toContain("Done (2)")
+    expect(f).toContain(chip("To do", 2))
+    expect(f).toContain(chip("In progress", 5))
+    expect(f).toContain(chip("Done", 2))
     expect(f).not.toContain("Blocked")
     r.unmount()
   })
@@ -97,7 +101,7 @@ describe("IssueBoard", () => {
       .split("\n")
       .find((l) => l.includes("SHOP-412"))!
     expect(line).toContain("⋯ → QA")
-    expect(r.lastFrame()).toContain("In progress (5)")
+    expect(r.lastFrame()).toContain(chip("In progress", 5))
     r.unmount()
   })
 
@@ -691,9 +695,9 @@ describe("IssueBoardSkeleton", () => {
     )
     await r.waitFor("To do")
     const f = r.lastFrame()
-    expect(f).toContain("To do  (–)")
-    expect(f).toContain("In progress  (–)")
-    expect(f).toContain("Done  (–)")
+    expect(f).toContain(chip("To do", " –"))
+    expect(f).toContain(chip("In progress", " –"))
+    expect(f).toContain(chip("Done", " –"))
     r.unmount()
   })
 
