@@ -31,19 +31,19 @@
   },
   "dependencies": {
     "@kud/ink-markdown": "0.3.3",
-    "@kud/jira": "0.4.0"
+    "@kud/jira": "0.7.0"
   },
   "devDependencies": {
     "@kud/cli-testing": "0.1.0",
-    "@kud/ink-ui": "0.36.0",
-    "@types/node": "26.5.0",
-    "@types/react": "19.3.0",
+    "@kud/ink-ui": "0.47.0",
+    "@types/node": "26.6.10",
+    "@types/react": "19.3.2",
     "ink": "8.0.0",
     "ink-testing-library": "4.0.0",
     "react": "19.3.1",
     "tsup": "8.5.1",
     "typescript": "5.9.3",
-    "vitest": "5.0.0"
+    "vitest": "5.1.1"
   },
   "keywords": [
     "jira",

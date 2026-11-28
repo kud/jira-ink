@@ -741,7 +741,7 @@ const SKELETON_AGE = 2
 const SKELETON_TYPE_WIDTH = pillWidth("story")
 
 export type IssueBoardSkeletonProps = {
-  /** The board's tabs, known before its rows: labels are drawn, counts are `(–)`. */
+  /** The board's tabs, known before its rows: labels are drawn, counts are a `–` chip. */
   tabs: BoardTabs
   width: number
   height: number
